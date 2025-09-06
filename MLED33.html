@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLED RS232 Web</title>
+<style>
+  :root{
+    --bg:#242424; --fg:#e5e7eb; --mut:#cbd5e1;
+    --green:#22c55e; --greenH:#16a34a; --greenA:#15803d;
+    --red:#ef4444;   --redH:#dc2626;   --redA:#b91c1c;
+    --blue:#3b82f6;  --blueH:#2563eb;  --blueA:#1d4ed8;
+    --gray:#9ca3af;  --grayH:#a8afb7;  --grayA:#cbd5e1;
+    --input:#111111; --radius:16px;
+  }
+  *{box-sizing:border-box;font-family:Helvetica,Arial,sans-serif}
+  body{margin:0;background:var(--bg);color:var(--fg)}
+  .bar{background:#5b5b5b;color:#fff;padding:10px 14px;font-weight:700}
+  .bar.ok{background:#22c55e;color:#062b14}
+  .wrap{padding:14px;max-width:1100px;margin:0 auto}
+  label{margin-right:8px}
+  input[type="text"], input[type="number"], select, textarea{
+    background:var(--input);color:var(--fg);border:none;outline:1px solid #444;padding:10px;border-radius:8px;
+  }
+  textarea{width:100%;resize:none;height:44px}
+  .row{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
+  .spacer{flex:1}
+  .h{font-weight:800;font-size:22px;text-align:center;margin:14px 0}
+  .btn{display:inline-block;padding:14px 18px;border:none;border-radius:var(--radius);cursor:pointer;font-weight:800;color:#000}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .g{background:var(--green)} .g:hover{background:var(--greenH)} .g:active{background:var(--greenA)}
+  .r{background:var(--red)}   .r:hover{background:var(--redH)}   .r:active{background:var(--redA)}
+  .b{background:var(--blue)}  .b:hover{background:var(--blueH)}  .b:active{background:var(--blueA)}
+  .gr{background:var(--gray)} .gr:hover{background:var(--grayH)} .gr:active{background:var(--grayA)}
+  .full{width:100%}
+  .mut{color:var(--mut)}
+  .radio{display:flex;gap:14px;align-items:center}
+
+  /* preview */
+  .preview{background:#000;color:#e5e7eb;border-radius:14px;padding:10px 14px;outline:1px solid #333;min-height:62px}
+  .pv-row{display:flex;gap:10px;align-items:center}
+  .pv-left{flex:1;font-family:Menlo,Consolas,monospace;font-size:28px;letter-spacing:1px;white-space:pre-wrap;text-align:left}
+  .pv-right{flex:0 0 auto;font-size:18px;font-weight:800;color:#9ca3af;text-align:right}
+  .seg{display:inline}
+
+  /* three columns under text box */
+  .triple{display:flex;align-items:center;gap:10px}
+  .triple > .left{flex:1;display:flex;align-items:center;gap:10px}
+  .triple > .center{flex:0 0 auto;display:flex;align-items:center;gap:8px;justify-content:center;margin:0 auto}
+  .triple > .right{flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end}
+
+
+  .ta-wrap{position:relative}
+  .ta-counter{position:absolute;right:12px;bottom:8px;color:var(--mut);font-size:12px;pointer-events:none}
+
+
+.badge{padding:10px 16px;border-radius:16px;font-weight:800;background:#555;color:#eee}
+.badge.ok{background:#22c55e;color:#062b14}
+.btn.g:disabled{background:#9ca3af !important;color:#0b0f19 !important;opacity:1}
+
+
+  .triple > .mid{flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+
+
+/* compact send row */
+.triple{display:flex;align-items:center;gap:16px;margin-top:6px}
+.triple>.left{flex:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.triple>.mid{flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+.triple>.right{flex:1;display:flex;align-items:center;gap:12px;justify-content:flex-end;flex-wrap:wrap}
+.btn.s{padding:8px 14px;border-radius:12px;min-width:120px;font-size:14px}
+
+</style>
+</head>
+<body>
+  <div id="status" class="bar">Disconnected</div>
+
+  <div class="wrap">
+    <!-- top row: connect + line + brightness -->
+    <div class="row">
+      <button id="btnConnect" class="btn g">Connect</button>
+      <button id="btnDisconnect" class="btn r" disabled>Disconnect</button>
+      <div class="spacer"></div>
+      <span id="fdsBadge" class="badge">FDS MLED</span>
+      <div class="spacer"></div>
+      <label>Line</label>
+      <select id="line"></select>
+      <label style="margin-left:12px">Brightness</label>
+      <label><input type="radio" name="br" value="1" checked> 1</label>
+      <label><input type="radio" name="br" value="2"> 2</label>
+      <label><input type="radio" name="br" value="3"> 3</label>
+    </div>
+
+    <!-- preview directly below top; left = payload text, right = active label -->
+    <div class="preview">
+      <div class="pv-row">
+        <div id="pvLeft" class="pv-left"></div>
+        <div id="pvRight" class="pv-right">Active: Idle</div>
+      </div>
+    </div>
+
+    <!-- TEXT -->
+    <div class="h">Text to display</div>
+    <div class="ta-wrap"><textarea id="text" placeholder="max 64 bytes"></textarea><div id="counterIn" class="ta-counter">64 left</div></div>
+    <div class="row" id="counterRow" style="display:none"><span class="mut" id="counter">64 left</span></div>
+
+    <!-- below the text box: scroll left, color center, rainbow right -->
+    <div class="triple" style="margin-top:2px">
+      <div class="left">
+        <label>Scroll speed</label>
+        <label><input type="radio" name="sp" value="0" checked> 0</label>
+        <label><input type="radio" name="sp" value="1"> 1</label>
+        <label><input type="radio" name="sp" value="2"> 2</label>
+        <label><input type="radio" name="sp" value="3"> 3</label>
+      </div>
+      <div class="mid"><button id="send" class="btn g s" disabled>Send text</button></div>
+    
+      <div class="center">
+        <label>Text color</label>
+        <select id="txtColor"></select>
+      </div>
+      <div class="right">
+        <label for="rainbow">Rainbow</label>
+        <input id="rainbow" type="checkbox">
+      </div>
+    </div>
+<!-- CW BEFORE Timer -->
+    <div class="h">Coursewalks</div>
+
+    <div class="triple" id="cwRow">
+      <div class="left">
+        <label><input type="radio" name="cwver" value="1" checked> CW1</label>
+        <label><input type="radio" name="cwver" value="2"> CW2</label>
+        <label><input type="radio" name="cwver" value="3"> CW3</label>
+        <label><input type="radio" name="cwver" value="4"> CW4</label>
+      </div>
+      <div class="center">
+        <button id="cwStart" class="btn g" disabled>Start</button>
+      </div>
+      <div class="right">
+        <label>CW duration:</label>
+        <label><input type="radio" name="cwmin" value="7"> 7 min</label>
+        <label><input type="radio" name="cwmin" value="8"> 8 min</label>
+        <label><input type="radio" name="cwmin" value="9" checked> 9 min</label>
+        <label><input type="radio" name="cwmin" value="10"> 10 min</label>
+      </div>
+    </div>
+
+    <!-- TIMER -->
+<!-- TIMER -->
+    <div class="h">Timer</div>
+
+    <div class="row">
+      <label>Count up</label>
+      <label style="margin-left:12px">Color</label>
+      <select id="upColor"></select>
+      <button id="upStart" class="btn g" disabled>Start</button>
+      <button id="upStop" class="btn r" disabled>Stop</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Count down</label>
+        <label class="mut">hh</label> <input id="downHH" type="number" min="0" max="1" value="0" style="width:60px"> <label style="margin-left:12px">mm</label>
+        <input id="downMM" type="number" min="0" max="99" value="10" style="width:70px">
+        <label>ss</label>
+        <input id="downSS" type="number" min="0" max="59" value="00" style="width:70px">
+        <label style="margin-left:12px">Color</label>
+        <select id="downColor"></select>
+      </div>
+      <button id="downStart" class="btn g" disabled>Start</button>
+      <button id="downStop" class="btn r" disabled>Stop</button>
+    </div>
+
+    <div class="row" style="gap:10px">
+      <label>After text</label>
+      <input id="afterText" type="text" maxlength="30" style="width:420px">
+      <span class="mut" id="afterCount">0/30</span>
+      <label style="margin-left:12px">Show (s)</label>
+      <input id="afterSecs" type="number" min="1" max="180" value="5" style="width:70px">
+      
+    </div>
+
+    <button id="clearAll" class="btn b full" disabled>Clear</button>
+  </div>
+
+<script>
+  // --- constants ---
+  const STX = 0x02, LF = 0x0A;
+  const COLORS = [
+    ["Default", null], ["Red",1],["Green",2],["Blue",3],["Yellow",4],
+    ["Magenta",5],["Cyan",6],["White",7],["Orange",8],["Deep pink",9],["Light Blue",10]
+  ];
+  const CSS_FOR_CODE = {
+    0:"#000000", 1:"#ef4444", 2:"#22c55e", 3:"#3b82f6", 4:"#fde047",
+    5:"#e879f9", 6:"#22d3ee", 7:"#fafafa", 8:"#fb923c", 9:"#f472b6", 10:"#60a5fa"
+  };
+  const RAINBOW_CODES = [1,2,3,4,5,6,7,8,9,10];
+  const BLUE = 3, PINK = 9;
+
+  const $ = sel => document.querySelector(sel);
+  const statusBar = $("#status");
+  const pvLeft = $("#pvLeft");
+  const pvRight = $("#pvRight");
+
+  // UI refs
+  const lineSel = $("#line"); const brRadios = [...document.querySelectorAll('input[name="br"]')];
+  const txtColor = $("#txtColor"); const txtArea = $("#text"); const counter = $("#counter");
+  const sendBtn = $("#send"); const rainbow = $("#rainbow"); const spRadios = [...document.querySelectorAll('input[name="sp"]')];
+  const upColor = $("#upColor"), upStart=$("#upStart"), upStop=$("#upStop");
+  const downMM=$("#downMM"), downSS=$("#downSS"), downColor=$("#downColor");
+  const downStart=$("#downStart"), downStop=$("#downStop");
+  const afterText=$("#afterText"), afterCount=$("#afterCount"), afterSecs=$("#afterSecs");
+  const clearAll=$("#clearAll");
+  const btnConnect=$("#btnConnect"), btnDisconnect=$("#btnDisconnect");
+
+  const cwStart=$("#cwStart");
+  const cwVerRadios = [...document.querySelectorAll('input[name="cwver"]')];
+  const cwMinRadios = [...document.querySelectorAll('input[name="cwmin"]')];
+
+  // fill selects
+  for(let i=1;i<=15;i++){ const o=document.createElement("option");o.text=i;o.value=String(i); lineSel.appendChild(o); }
+  COLORS.forEach(([name])=>{
+    [txtColor,upColor,downColor].forEach(sel=>{
+      const o=document.createElement("option"); o.text=name; o.value=name; sel.appendChild(o);
+    });
+  });
+  lineSel.value="7"; brRadios.find(r=>r.value==="1").checked=true; txtColor.value="Default"; upColor.value="Green"; downColor.value="Default";
+
+  // serial state
+  let port=null, writer=null;
+  let lockMode=null; // null | 'text' | 'up' | 'down' | 'cw'
+  let upTimer=null, upStartTs=0;
+  let scrollJob=null, scrollBuf="", scrollDelay=550, scrollColor=null, scrollIdx=0, scrollLen=0, scrollRainbow=false, rbIdx=0;
+  // down state
+  let downTimer=null, downEndTs=0, downColorCode=null;
+
+  // CW state
+  let cwTimers = []; let cwCancel = false;
+
+  // --- helpers ---
+  function encodeLatin1(str){
+    const len = str.length;
+    const out = new Uint8Array(len);
+    for(let i=0;i<len;i++){ out[i] = str.charCodeAt(i) & 0xFF; }
+    return out;
+  }
+  function frame(line, br, payload){
+    const bytes = [STX];
+    bytes.push(line.charCodeAt(0) & 0xFF);
+    bytes.push(br.charCodeAt(0) & 0xFF);
+    encodeLatin1(payload).forEach(b=>bytes.push(b));
+    bytes.push(LF);
+    return new Uint8Array(bytes);
+  }
+  function wrapColor(text, code){ return code==null ? text : `^cs ${code}^${text}^cs 0^`; }
+  function colorCodeByName(name){ return COLORS.find(([n])=>n===name)?.[1] ?? null; }
+  function cssByCode(code){ return CSS_FOR_CODE[code ?? 7] || "#e5e7eb"; }
+
+  // sanitize with Polish mapping + deaccent
+  function sanitize(s){
+    const map = {'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ż':'z','ź':'z','Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ż':'Z','Ź':'Z','ß':'ss','Æ':'AE','æ':'ae','Œ':'OE','œ':'oe'};
+    let out="";
+    for(const ch of s){
+      if(ch==='^'){ out+='*'; continue; }
+      const rep = map[ch] ?? ch;
+      out += rep.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E\xE0-\xFF]/g,'*');
+    }
+    return out;
+  }
+
+  function setPreviewSegments(segments){
+    pvLeft.innerHTML = "";
+    if(!segments || !segments.length){ return; }
+    for(const seg of segments){
+      const span = document.createElement("span");
+      span.className = "seg";
+      span.textContent = seg.text;
+      span.style.color = cssByCode(seg.code);
+      pvLeft.appendChild(span);
+    }
+  }
+  function setActiveLabel(name){ pvRight.textContent = `Active: ${name}`; pvRight.style.color = (name && name!=='Idle') ? 'var(--green)' : '#9ca3af'; }
+
+  function parsePreviewFromPayload(payload){
+    // basic parser for ^cs X^...^cs 0^
+    const segs = [];
+    let i=0, curColor=null, text="";
+    while(i<payload.length){
+      if(payload[i]==="^"){
+        if(payload.startsWith("^cs ", i)){
+          if(text){ segs.push({text, code:curColor}); text=""; }
+          const m = payload.slice(i).match(/^\^cs\s+(\d{1,2})\^/);
+          if(m){ curColor = Number(m[1]); i += m[0].length; continue; }
+        }
+        if(payload.startsWith("^cs 0^", i)){
+          if(text){ segs.push({text, code:curColor}); text=""; }
+          curColor = null; i += "^cs 0^".length; continue;
+        }
+        const end = payload.indexOf("^", i+1);
+        if(end>i){ i = end+1; continue; } else { break; }
+      }
+      text += payload[i]; i++;
+    }
+    if(text){ segs.push({text, code:curColor}); }
+    if(segs.length===0){ segs.push({text:payload.replace(/\^/g,""), code:null}); }
+    setPreviewSegments(segs);
+  }
+
+  async function sendPayload(payload){
+    if(!writer){ alert("Not connected"); return; }
+    if(payload.length>64){ alert("Payload >64"); return; }
+    const f = frame(lineSel.value, brRadios.find(r=>r.checked).value, payload);
+    await writer.write(f);
+    // preview
+    if(payload.startsWith("^rt ")){
+      const m = payload.match(/^\^rt\s+\d+\s+([0-9:.]+)\^/);
+      const disp = m ? m[1] : "";
+      setPreviewSegments([{text:disp, code:null}]);
+    }else{
+      parsePreviewFromPayload(payload);
+    }
+  }
+
+  function overheadFor(code){
+    return code==null ? 0 : (`^cs ${code}^`.length + `^cs 0^`.length);
+  }
+  function updateCounter(){
+    const code = rainbow.checked ? 10 : colorCodeByName(txtColor.value);
+    const allowed = Math.max(0, 64 - overheadFor(code));
+    const s = txtArea.value;
+    if(s.length>allowed) txtArea.value = s.slice(0, allowed);
+    const left = allowed - txtArea.value.length;
+    const txt = `${left} left`;
+    const cnt = document.getElementById("counter");
+    if(cnt){ cnt.textContent = txt; cnt.style.color = left < 0 ? "#ef4444" : "var(--mut)"; }
+    const cin = document.getElementById("counterIn");
+    if(cin){ cin.textContent = txt; cin.style.color = left < 0 ? "#ef4444" : "var(--mut)"; }
+  }
+  txtArea.addEventListener("input", updateCounter);
+  txtColor.addEventListener("change", updateCounter);
+  rainbow.addEventListener("change", ()=>{
+    if(rainbow.checked){
+      spRadios.find(r=>r.value==="1").checked=true;
+      spRadios.find(r=>r.value==="0").disabled=true;
+      txtColor.disabled=true;
+    }else{
+      spRadios.find(r=>r.value==="0").disabled=false;
+      txtColor.disabled=false;
+    }
+    updateCounter();
+  });
+  afterText.addEventListener("input", ()=> afterCount.textContent = `${afterText.value.length}/30` );
+
+  // connect / disconnect
+  btnConnect.onclick = async ()=>{
+    try{
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate:9600, dataBits:8, parity:"none", stopBits:1, flowControl:"none" });
+      writer = port.writable.getWriter();
+      btnDisconnect.disabled=false; btnConnect.disabled=true; btnConnect.classList.remove("g"); btnConnect.classList.add("gr");
+      statusBar.classList.add("ok");
+      let extra="";
+      try{
+        const info = port?.getInfo?.();
+        if(info && (info.usbVendorId!=null || info.usbProductId!=null)){
+          const vid = info.usbVendorId!=null ? info.usbVendorId.toString(16) : "";
+          const pid = info.usbProductId!=null ? info.usbProductId.toString(16) : "";
+          extra = ` (VID:${vid}${pid?` PID:${pid}`:""})`;
+        }
+      }catch(e){}
+      statusBar.textContent = "Connected"+extra;
+// enable all buttons except Connect
+      document.querySelectorAll("button").forEach(btn=>{
+        if(btn.id!=="btnConnect") btn.disabled=false;
+      });
+      btnConnect.disabled=true;
+// welcome 1s: FDS MLED green
+      await sendPayload("^cs 2^FDS MLED^cs 0^");
+      setTimeout(()=> sendPayload(""), 1000);
+// welcome 1s: checker flag only
+      const fds = document.getElementById("fdsBadge"); if(fds){ fds.classList.add("ok"); }
+      setActiveLabel("Idle");
+    setCWLocked(false);
+      // welcome 1s: 5 green traffic lights
+      setTimeout(()=> sendPayload(""), 1000);
+setTimeout(()=> sendPayload(""), 1000);
+    }catch(e){ console.error(e); alert("Connect error"); }
+  };
+  btnDisconnect.onclick = async ()=>{
+    try{
+      stopScroll(); stopUp(); cwStopAll();
+      if(writer){ writer.releaseLock(); writer=null; }
+      if(port){ await port.close(); port=null; }
+    }catch{}
+    btnDisconnect.disabled=true; btnConnect.disabled=false; btnConnect.classList.remove("gr"); btnConnect.classList.add("g");
+    statusBar.classList.remove("ok"); statusBar.textContent = "Disconnected";
+    const fds = document.getElementById("fdsBadge"); if(fds){ fds.classList.remove("ok"); }
+    setActiveLabel("Idle"); setPreviewSegments([]);
+  };
+
+  // lock and active label
+  function setLock(mode){ lockMode = mode; }
+  function setCWLocked(on){
+    const nodes = Array.from(document.querySelectorAll('input, select, textarea, button'));
+    nodes.forEach(el=>{
+      if(el.id==='clearAll' || el.id==='btnDisconnect') return;
+      if(on){ el.dataset.prevDisabled = el.disabled?'1':'0'; el.disabled = true; }
+      else{
+        if(el.dataset.prevDisabled==='1'){ el.disabled = true } else { el.disabled = false; }
+        delete el.dataset.prevDisabled;
+      }
+    });
+    const clr=document.getElementById('clearAll'); if(clr) clr.disabled = false;
+    const disc=document.getElementById('btnDisconnect'); if(disc) disc.disabled = false;
+  }
+  function ensureLock(need){
+    if(lockMode && lockMode!==need){ alert("Clear first"); return false; }
+    if(!lockMode) setLock(need);
+    const nameMap = {text:"Text to display", up:"Timer", down:"Timer", cw:"Coursewalks"};
+    setActiveLabel(nameMap[need] || "Idle");
+    return true;
+  }
+
+  // text send
+  function nextRainbowColor(){ const c = RAINBOW_CODES[rbIdx]; rbIdx=(rbIdx+1)%RAINBOW_CODES.length; return c; }
+  function sendTextOnce(text, colorOverride=null){
+    const code = colorOverride ?? colorCodeByName(txtColor.value);
+    let s = sanitize(text);
+    const max = 64 - overheadFor(code);
+    if(s.length>max) s = s.slice(0, max);
+    const payload = wrapColor(s, code);
+    sendPayload(payload);
+  }
+  function startScroll(text, colorOverride=null, rainbowCycle=false){
+    stopScroll();
+    let s = sanitize(text);
+    const code = colorOverride ?? colorCodeByName(txtColor.value);
+    const max = 64 - overheadFor(code);
+    if(s.length>max) s = s.slice(0, max);
+    scrollBuf = s + "   ";
+    const sp = Number(spRadios.find(r=>r.checked).value);
+    scrollDelay = {1:550,2:350,3:220}[sp] || 550;
+    scrollColor = code;
+    scrollLen = scrollBuf.length; scrollIdx=0; scrollRainbow = rainbowCycle;
+    if(sp===0){ sendTextOnce(s, code); return; }
+    scrollStep();
+  }
+  function scrollStep(){
+    if(!scrollBuf) return;
+    scrollBuf = scrollBuf.slice(1) + scrollBuf[0];
+    const chunk = scrollBuf.slice(0, 64 - overheadFor(scrollColor));
+    sendTextOnce(chunk, scrollColor);
+    scrollIdx = (scrollIdx+1)%scrollLen;
+    if(scrollRainbow && scrollIdx===0){ scrollColor = nextRainbowColor(); }
+    scrollJob = setTimeout(scrollStep, scrollDelay);
+  }
+  function stopScroll(){ if(scrollJob){ clearTimeout(scrollJob); scrollJob=null; } scrollBuf=""; }
+
+  sendBtn.onclick = ()=>{
+    if(!ensureLock("text")) return;
+    const text = txtArea.value.trim();
+    if(!text){ alert("Empty text"); return; }
+    stopScroll();
+    if(rainbow.checked){
+      startScroll(text, nextRainbowColor(), true);
+      return;
+    }
+    const sp = Number(spRadios.find(r=>r.checked).value);
+    if(sp>0) startScroll(text);
+    else sendTextOnce(text);
+  };
+
+  // clear
+  function cwStopAll(){
+    cwCancel = true;
+    cwTimers.forEach(id=>clearTimeout(id));
+    cwTimers = [];
+  }
+  clearAll.onclick = ()=>{ setCWLocked(false);
+    stopScroll(); stopUp(); stopDown(); cwStopAll();
+    setLock(null);
+    setActiveLabel("Idle");
+    sendPayload("");
+    setPreviewSegments([]);
+  };
+
+  // up timer
+  function tickUp(){
+    const now = performance.now();
+    const elapsed = Math.max(0, (now - upStartTs)/1000);
+    const mm = Math.floor(elapsed/60);
+    const ss = Math.floor(elapsed%60);
+    const cc = Math.floor((elapsed - Math.floor(elapsed))*100);
+    const text = mm===0 ? `${String(ss).padStart(2,'0')}.${String(cc).padStart(2,'0')}`
+                        : `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}.${String(cc).padStart(2,'0')}`;
+    const code = colorCodeByName(upColor.value);
+    sendPayload(wrapColor(text, code));
+    upTimer = setTimeout(tickUp, 100);
+  }
+  function stopUp(){ if(upTimer){ clearTimeout(upTimer); upTimer=null;   // auto-clear after 30s
+  setTimeout(()=>{
+    sendPayload("");
+    setLock(null);
+    setActiveLabel("Idle");
+    setPreviewSegments([]);
+  }, 30000);
+} }
+  upStart.onclick = ()=>{ if(!ensureLock("up")) return; stopUp(); upStartTs=performance.now(); tickUp(); };
+  upStop.onclick  = ()=>{ stopUp(); };
+
+  // down
+  function tickDown(){
+    if(!downTimer) return;
+    const now = performance.now();
+    const remainSec = Math.max(0, Math.floor((downEndTs - now)/1000));
+    const h = Math.floor(remainSec/3600);
+    const m = Math.floor((remainSec%3600)/60);
+    const s = remainSec % 60;
+    const fmt = h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+    setPreviewSegments([{text:fmt, code:downColorCode}]);
+    if(remainSec<=0){ stopDown(); showAfterText(); }else{
+      downTimer = setTimeout(tickDown, 250);
+    }
+  }
+  function stopDown(){
+    if(downTimer){ clearTimeout(downTimer); downTimer=null; }
+  }
+  downStart.onclick = ()=>{
+    if(!ensureLock("down")) return;
+    stopUp(); stopDown();
+    const hh = Number((document.getElementById('downHH')?.value)||0), mm = Number(downMM.value||0), ss = Number(downSS.value||0);
+    const total = hh*3600 + mm*60 + ss;
+    const fmt = (hh>0)?`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`:`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    downColorCode = colorCodeByName(downColor.value);
+    // device countdown
+    sendPayload(wrapColor(`^rt 2 ${fmt}^`, downColorCode));
+    // local preview mirror
+    downEndTs = performance.now() + total*1000;
+    downTimer = setTimeout(tickDown, 10);
+  };
+  downStop.onclick = ()=>{
+    if(lockMode!=="down") return;
+    // freeze value: compute current remain and send as static text
+    const now = performance.now();
+    const remainSec = Math.max(0, Math.floor((downEndTs - now)/1000));
+    const h = Math.floor(remainSec/3600);
+    const m = Math.floor((remainSec%3600)/60);
+    const s = remainSec % 60;
+    const fmt = h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+    stopDown();
+    sendPayload(wrapColor(fmt, downColorCode));
+    // keep lock until Clear
+  };
+
+  // disconnect auto
+  navigator.serial?.addEventListener("disconnect", async ()=>{
+    try{ if(writer){ writer.releaseLock(); writer=null; } if(port){ await port.close(); port=null; } }catch{}
+    btnDisconnect.disabled=true; btnConnect.disabled=false;
+    statusBar.classList.remove("ok"); statusBar.textContent = "Disconnected";
+    setActiveLabel("Idle"); setPreviewSegments([]);
+  });
+
+  // -------- Coursewalks logic --------
+  function cwLabel(i, n){ return `${i}/${n}`; }
+  function dualColor(leftText, leftCode, rightText, rightCode){
+    return `^cs ${leftCode}^${leftText}^cs 0^ ^cs ${rightCode}^${rightText}^cs 0^`;
+  }
+  function mixColor(label, num, labelCode, numCode){
+    return `^cs ${labelCode}^${label}^cs 0^ ^cs ${numCode}^${num}^cs 0^`;
+  }
+  function sleep(ms){ return new Promise(res=>{ const id=setTimeout(res, ms); cwTimers.push(id); }); }
+  function fmtMSS(totalSeconds){
+    const m = Math.floor(totalSeconds/60);
+    const s = totalSeconds%60;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  async function cwRunOne(label, minutes){
+    if(cwCancel) return;
+    const soonPayload = dualColor(label, 3, "soon", 9);
+    await sendPayload(soonPayload);
+    setActiveLabel("Coursewalks");
+    await sleep(20000);
+    if(cwCancel) return;
+    let seconds = Math.max(0, Math.floor(minutes*60));
+    for(let t=seconds; t>=1; t--){
+      if(cwCancel) return;
+      const disp = fmtMSS(t);
+      await sendPayload( mixColor(label, disp, 3, 9) );
+      await sleep(1000);
+    }
+    if(cwCancel) return;
+    const endPayload = dualColor(label, 3, "END", 9);
+    await sendPayload(endPayload);
+    await sleep(20000);
+    if(cwCancel) return;
+    }
+
+  async function runCoursewalk(n, minutes){
+    if(!ensureLock("cw")) return;
+    cwCancel = false; cwTimers = [];
+    for(let i=1;i<=n;i++){
+      if(cwCancel) break;
+      const label = cwLabel(i,n);
+      await cwRunOne(label, minutes);
+    }
+    setLock(null);
+    setActiveLabel("Idle");
+  }
+
+  cwStart.onclick = ()=>{ setCWLocked(true);
+    const ver = Number(cwVerRadios.find(r=>r.checked).value);
+    const mins = Number(cwMinRadios.find(r=>r.checked).value);
+    runCoursewalk(ver, mins);
+  };
+
+  // init
+  updateCounter();
+
+function showAfterText(){
+  const txt = sanitize(afterText.value || "");
+  const secs = Math.min(180, Math.max(1, Number(afterSecs.value||5)));
+  if(!txt){
+    setLock(null); setActiveLabel("Idle"); sendPayload(""); setPreviewSegments([]);
+    return;
+  }
+  const code = downColorCode;
+  sendPayload(wrapColor(txt, code));
+  setPreviewSegments([{text:txt, code}]);
+  setTimeout(()=>{
+    sendPayload("");
+    setLock(null);
+    setActiveLabel("Idle");
+    setPreviewSegments([]);
+  }, secs*1000);
+}
+
+
+// duration tools
+const appStart = Date.now();
+function fmtDuration(ms){
+  const totalSec = Math.floor(ms/1000);
+  const h = Math.floor(totalSec/3600);
+  const m = Math.floor((totalSec%3600)/60);
+  const s = totalSec%60;
+  return h+":"+(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+}
+const btnShowDuration = document.getElementById("btnShowDuration");
+if(btnShowDuration){
+  btnShowDuration.onclick = ()=>{
+    const dur = fmtDuration(Date.now()-appStart);
+    const payload = `^cs 2^${dur}^cs 0^`;
+    sendPayload(payload);
+    setPreviewSegments([{text:dur, code:2}]);
+  };
+}
+
+
+// duration tools (ensure single init)
+if(!window.__duration_init__){
+  window.__duration_init__ = true;
+  window.appStart = window.appStart || Date.now();
+  function fmtDuration(ms){
+    const totalSec = Math.floor(ms/1000);
+    const h = Math.floor(totalSec/3600);
+    const m = Math.floor((totalSec%3600)/60);
+    const s = totalSec%60;
+    return h+":"+(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  }
+  const btnShowDuration = document.getElementById("btnShowDuration");
+  if(btnShowDuration){
+    btnShowDuration.onclick = ()=>{
+      const dur = fmtDuration(Date.now()-window.appStart);
+      const payload = `^cs 2^${dur}^cs 0^`;
+      sendPayload(payload);
+      setPreviewSegments([{text:dur, code:2}]);
+    };
+  }
+}
+
+</script>
+</body>
+</html>
