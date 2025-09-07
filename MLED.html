@@ -1,0 +1,2276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLED RS232 Web</title>
+<style>
+  :root{
+    --bg:#242424; --fg:#e5e7eb; --mut:#cbd5e1;
+    --green:#22c55e; --greenH:#16a34a; --greenA:#15803d;
+    --red:#ef4444;   --redH:#dc2626;   --redA:#b91c1c;
+    --blue:#3b82f6;  --blueH:#2563eb;  --blueA:#1d4ed8;
+    --gray:#9ca3af;  --grayH:#a8afb7;  --grayA:#cbd5e1;
+    --input:#111111; --radius:16px;
+  }
+  *{box-sizing:border-box;font-family:Helvetica,Arial,sans-serif}
+  body{margin:0;background:var(--bg);color:var(--fg)}
+  .bar{background:#5b5b5b;color:#fff;padding:10px 14px;font-weight:700}
+  .bar.ok{background:#22c55e;color:#062b14}
+  .wrap{padding:14px;max-width:1100px;margin:0 auto}
+  label{margin-right:8px}
+  input[type="text"], input[type="number"], select, textarea{
+    background:var(--input);color:var(--fg);border:none;outline:1px solid #444;padding:10px;border-radius:8px;
+  }
+  textarea{width:100%;resize:none;height:44px}
+  .row{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
+  .spacer{flex:1}
+  .h{font-weight:800;font-size:22px;text-align:center;margin:14px 0}
+  .btn{display:inline-block;padding:14px 18px;border:none;border-radius:var(--radius);cursor:pointer;font-weight:800;color:#000}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .g{background:var(--green)} .g:hover{background:var(--greenH)} .g:active{background:var(--greenA)}
+  .r{background:var(--red)}   .r:hover{background:var(--redH)}   .r:active{background:var(--redA)}
+  .b{background:var(--blue)}  .b:hover{background:var(--blueH)}  .b:active{background:var(--blueA)}
+  .gr{background:var(--gray)} .gr:hover{background:var(--grayH)} .gr:active{background:var(--grayA)}
+  .full{width:100%}
+  .mut{color:var(--mut)}
+  .radio{display:flex;gap:14px;align-items:center}
+
+  /* preview */
+  .preview{background:#000;color:#e5e7eb;border-radius:14px;padding:10px 14px;outline:1px solid #333;min-height:62px}
+  .pv-row{display:flex;gap:10px;align-items:center}
+  .pv-left{flex:1;font-family:Menlo,Consolas,monospace;font-size:28px;letter-spacing:1px;white-space:pre-wrap;text-align:left}
+  .pv-right{flex:0 0 auto;font-size:18px;font-weight:800;color:#9ca3af;text-align:right}
+  .seg{display:inline}
+
+  /* three columns under text box */
+  .triple{display:flex;align-items:center;gap:10px}
+  .triple > .left{flex:1;display:flex;align-items:center;gap:10px}
+  .triple > .center{flex:0 0 auto;display:flex;align-items:center;gap:8px;justify-content:center;margin:0 auto}
+  .triple > .right{flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end}
+
+
+  .ta-wrap{position:relative}
+  .ta-counter{position:absolute;right:12px;bottom:8px;color:var(--mut);font-size:12px;pointer-events:none}
+
+
+.badge{padding:10px 16px;border-radius:16px;font-weight:800;background:#555;color:#eee}
+.badge.ok{background:#22c55e;color:#062b14}
+.btn.g:disabled{background:#9ca3af !important;color:#0b0f19 !important;opacity:1}
+
+
+  .triple > .mid{flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+
+
+/* compact send row */
+.triple{display:flex;align-items:center;gap:16px;margin-top:6px}
+.triple>.left{flex:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.triple>.mid{flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+.triple>.right{flex:1;display:flex;align-items:center;gap:12px;justify-content:flex-end;flex-wrap:wrap}
+.btn.s{padding:8px 14px;border-radius:12px;min-width:120px;font-size:14px}
+
+
+  /* visual module boxes */
+  .box{border:1px solid #333;border-radius:16px;padding:12px;margin:12px 0}
+  /* module 1 attaches to green bar above */
+  #status.bar{border:1px solid #333;border-radius:16px 16px 0 0;margin-bottom:0}
+  .box.mod1{border-top:none;border-radius:0 0 16px 16px;margin-top:0}
+
+
+  body{background:#1a1a1a;color:var(--fg)}
+  .wrap{background:#242424;padding:14px;max-width:1100px;margin:0 auto;border-radius:20px}
+  .box{background:#1e1e1e}
+  #status.bar{max-width:400px;margin:0 auto}
+
+
+  .box{position:relative}
+  .box-toggle{position:absolute; top:8px; left:10px; font-size:12px; opacity:.9}
+  .box-toggle input{vertical-align:middle}
+  #status.bar{width:100%; margin:0 0 8px 0; border-radius:12px}
+
+
+  /* toggle switch look */
+  .box-toggle label{display:inline-flex;align-items:center;gap:8px;font-size:12px}
+  .box-toggle input[type="checkbox"]{appearance:none;width:40px;height:22px;border-radius:999px;background:#555;position:relative;outline:none;cursor:pointer;transition:background .2s}
+  .box-toggle input[type="checkbox"]::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#bbb;transition:left .2s}
+  .box-toggle input[type="checkbox"]:checked{background:#22c55e}
+  .box-toggle input[type="checkbox"]:checked::after{left:21px;background:#0b0}
+  /* disabled module visuals */
+  .box.disabled{opacity:.6}
+
+
+  /* status bar: full width inside top box */
+  #status.bar{width:100%; max-width:none; border-radius:14px; padding:12px 16px; font-size:16px}
+
+  /* brightness 3-position slider */
+  .br-wrap{display:flex;align-items:center;gap:8px}
+  .br-group{display:none} /* hide original radios, we keep them for logic */
+  .br-slider{position:relative; width:180px; height:34px; background:#2d2d2d; border:1px solid #444; border-radius:999px; display:flex; align-items:center; justify-content:space-between; padding:0 8px}
+  .br-slider button{flex:1; height:28px; margin:0 4px; border:none; background:transparent; color:#cbd5e1; font-weight:700; cursor:pointer}
+  .br-slider .knob{position:absolute; top:3px; width:56px; height:28px; border-radius:999px; background:#3b3b3b; transition:left .15s}
+  .br-slider[data-pos="1"] .knob{left:3px}
+  .br-slider[data-pos="2"] .knob{left:62px}
+  .br-slider[data-pos="3"] .knob{left:121px}
+
+
+/* --- unified box headers --- */
+.box .h{font-size:24px !important; text-transform:uppercase; letter-spacing:.5px}
+
+/* --- high-contrast toggles with black knob --- */
+.box-toggle{position:absolute; top:8px; left:10px; font-size:12px}
+.box-toggle label{display:inline-flex; align-items:center; gap:8px}
+.box-toggle input[type="checkbox"]{
+  appearance:none; -webkit-appearance:none; width:44px; height:24px;
+  border-radius:999px; background:#666; border:1px solid #444;
+  position:relative; cursor:pointer; outline:none; transition:background .2s, border-color .2s
+}
+.box-toggle input[type="checkbox"]::after{
+  content:""; position:absolute; top:3px; left:3px; width:18px; height:18px;
+  border-radius:50%; background:#000; transition:left .2s, background .2s
+}
+.box-toggle input[type="checkbox"]:checked{ background:#22c55e; border-color:#16a34a }
+.box-toggle input[type="checkbox"]:checked::after{ left:23px; background:#000 }
+
+
+/* block interactions for disabled modules */
+.box{position:relative}
+
+/* block interactions for disabled modules, but keep toggle + Clear on top */
+.box{position:relative}
+#clearAll{position:relative; z-index:15} /* keep Clear clickable even if its box is disabled */
+
+
+/* keep module toggles clickable even when disabled */
+.box-toggle{position:absolute; top:8px; left:10px; z-index:20; pointer-events:auto}
+.box.disabled .box-toggle{pointer-events:auto}
+
+
+/* tiny tooltip bubble */
+.tip-bubble{
+  position:absolute;
+  background:#333;
+  color:#fff;
+  padding:10px 14px;
+  border-radius:8px;
+  font-size:14px;
+  max-width:240px;
+  box-shadow:0 2px 12px rgba(0,0,0,.5);
+  z-index:9999;
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(-6px);
+  transition:opacity .15s ease, transform .15s ease;
+}
+.tip-bubble.show{opacity:1; transform:translateY(0)}
+
+
+/* block interactions for disabled modules, but keep toggle + Clear on top */
+.box{position:relative}
+.box.disabled::after{content:'';display:none}
+.box-toggle{position:absolute; top:8px; left:10px; z-index:100; pointer-events:auto}
+#clearAll{position:relative; z-index:150}
+
+
+/* disabled visuals */
+.btn:disabled{
+  opacity:.5;
+  background:#4b5563 !important; /* gray */
+  border-color:#4b5563 !important;
+  color:#bbb !important;
+  cursor:not-allowed;
+}
+select:disabled, input[type="text"]:disabled, textarea:disabled {
+  opacity:.6;
+  background:#2d2f34 !important;
+  color:#888 !important;
+  cursor:not-allowed;
+}
+
+
+/* non-native button fallback */
+.btn.is-disabled{
+  opacity:.5;
+  background:#4b5563 !important;
+  border-color:#4b5563 !important;
+  color:#bbb !important;
+  pointer-events:none !important;
+  cursor:not-allowed !important;
+}
+
+
+/* force themed buttons to look disabled */
+.btn.g:disabled, .btn.r:disabled, .btn.b:disabled,
+.btn.g.is-disabled, .btn.r.is-disabled, .btn.b.is-disabled{
+  background:#4b5563 !important;
+  border-color:#4b5563 !important;
+  color:#bbb !important;
+  opacity:.55 !important;
+  pointer-events:none !important;
+}
+
+
+/* global OFF state: any button-like control inside a disabled box is inert */
+.box.disabled button,
+.box.disabled .btn{
+  pointer-events: none !important;
+  opacity: .55 !important;
+  background: #4b5563 !important;
+  border-color: #4b5563 !important;
+  color: #bbb !important;
+  cursor: not-allowed !important;
+}
+
+</style>
+
+<style id="hdmiPreviewFix">
+/* HDMI preview align fix */
+#hdmiPreviewBox{display:block !important; padding-top:8px !important; overflow:hidden;}
+#hdmiPreview{position:static !important; margin:0 !important; line-height:1 !important;}
+#hdmiPreviewInner{font-size:32px !important; line-height:1.05 !important; display:inline-block;}
+</style>
+
+</head>
+<body>
+
+<script>
+// Confirmation before enabling Data Integrator when other modules are ON
+document.addEventListener('DOMContentLoaded', function(){
+  var di = document.getElementById('sasx_enable');
+  var t2 = document.getElementById('mod2_enable');
+  var cw = document.getElementById('cw_enable');
+  var tm = document.getElementById('timer_enable');
+  if(!di) return;
+
+  di.addEventListener('change', function(e){
+    if(di.checked){
+      var anyOn = (t2 && t2.checked) || (cw && cw.checked) || (tm && tm.checked);
+      if(anyOn){
+        var ok = window.confirm('Enabling Data Integrator will turn off modules: MLED Text, Coursewalks and Countdown. Do you want to continue?');
+        if(!ok){
+          // revert without triggering force-offs
+          di.checked = false;
+          // fire a change so UI stays consistent
+          di.dispatchEvent(new Event('change'));
+        }
+      }
+    }
+  });
+});
+</script>
+
+
+<script>
+// Global capture listener so tooltip appears even if inner inputs are disabled
+document.addEventListener('mousedown', function(e){
+  try{
+    var di = document.getElementById('sasx_enable');
+    if(!di || !di.checked) return;
+    var t = e.target;
+    // Is the click inside one of the blocked toggles?
+    function has(id){
+      var el = document.getElementById(id);
+      return el && (t===el || (el.closest('.box-toggle') && (el.closest('.box-toggle').contains(t))));
+    }
+    if(has('mod2_enable') || has('cw_enable') || has('timer_enable')){
+      e.preventDefault(); e.stopPropagation();
+      // find a node to anchor the tip
+      var anchor = t.closest('.box-toggle') || t;
+      (function showTip(el){
+        var tip = document.createElement('div');
+        tip.className = 'tip-bubble';
+        tip.textContent = 'Disable DATA INTEGRATOR first';
+        document.body.appendChild(tip);
+        var r = el.getBoundingClientRect();
+        tip.style.left = (window.scrollX + r.left) + 'px';
+        tip.style.top  = (window.scrollY + r.top - 32) + 'px';
+        requestAnimationFrame(function(){ tip.classList.add('show'); });
+        setTimeout(function(){ tip.classList.remove('show'); setTimeout(function(){ tip.remove(); }, 180); }, 1500);
+      })(anchor);
+      return false;
+    }
+  }catch(_){}
+}, true);
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var di = document.getElementById('sasx_enable');
+  var ids = ['mod2_enable','cw_enable','timer_enable'];
+  function showTip(el, msg){
+    try{
+      var tip = document.createElement('div');
+      tip.className = 'tip-bubble';
+      tip.textContent = msg || 'Disable DATA INTEGRATOR first';
+      document.body.appendChild(tip);
+      var r = el.getBoundingClientRect();
+      tip.style.left = (window.scrollX + r.left) + 'px';
+      tip.style.top  = (window.scrollY + r.top - 32) + 'px';
+      requestAnimationFrame(function(){ tip.classList.add('show'); });
+      setTimeout(function(){
+        tip.classList.remove('show');
+        setTimeout(function(){ tip.remove(); }, 200);
+      }, 1500);
+    }catch(e){}
+  }
+  ids.forEach(function(id){
+    var input = document.getElementById(id);
+    if(!input) return;
+    var boxT = input.closest('.box-toggle') || input;
+    ['click','mousedown','touchstart'].forEach(function(evt){
+      boxT.addEventListener(evt, function(e){
+        if(di && di.checked){
+          e.preventDefault(); e.stopPropagation();
+          showTip(boxT, 'Disable DATA INTEGRATOR first');
+          return false;
+        }
+      }, {capture:true});
+    });
+  });
+});
+</script>
+
+
+<script>
+// Tooltip when DI is on and user tries to enable other modules
+document.addEventListener('DOMContentLoaded', function(){
+  var di = document.getElementById('sasx_enable');
+  var targets = ['mod2_enable','cw_enable','timer_enable']
+    .map(function(id){ return document.getElementById(id); })
+    .filter(Boolean);
+
+  function showTip(el, msg){
+    try{
+      var tip = document.createElement('div');
+      tip.className = 'tip-bubble';
+      tip.textContent = msg || 'Disable DATA INTEGRATOR first';
+      document.body.appendChild(tip);
+      var r = el.getBoundingClientRect();
+      // place above the toggle, aligned left
+      tip.style.left = (window.scrollX + r.left) + 'px';
+      tip.style.top  = (window.scrollY + r.top - 32) + 'px';
+      requestAnimationFrame(function(){ tip.classList.add('show'); });
+      setTimeout(function(){
+        tip.classList.remove('show');
+        setTimeout(function(){ tip.remove(); }, 200);
+      }, 1500);
+    }catch(e){}
+  }
+
+  function guard(tg){
+    if(!tg) return;
+    tg.addEventListener('change', function(){
+      if(di && di.checked && tg.checked){
+        // revert and hint
+        tg.checked = false;
+        tg.dispatchEvent(new Event('change'));
+        showTip(tg, 'Disable DATA INTEGRATOR first');
+      }
+    });
+  }
+
+  targets.forEach(guard);
+});
+</script>
+
+
+<script>
+// make DI fully active immediately when turned ON (without needing Clear)
+document.addEventListener('DOMContentLoaded', function(){
+  var di = document.getElementById('sasx_enable');
+  var mod4 = document.getElementById('mod4');
+  if(!di || !mod4) return;
+
+  // remember which controls were originally disabled
+  var ctrls = Array.from(mod4.querySelectorAll('input,select,textarea,button'));
+  ctrls.forEach(function(el){
+    if(el.id === 'sasx_enable') return; // skip the toggle itself
+    if(el.dataset.diOrigDisabled === undefined){
+      el.dataset.diOrigDisabled = el.disabled ? '1' : '0';
+    }
+  });
+
+  function enableAllInDI(){
+    ctrls.forEach(function(el){
+      if(el.id === 'sasx_enable') return;
+      // if element wasn't originally disabled, ensure it's enabled now
+      if(el.dataset.diOrigDisabled !== '1'){
+        el.disabled = false;
+      }
+    });
+  }
+
+  function maybeRestoreOriginal(){
+    ctrls.forEach(function(el){
+      if(el.id === 'sasx_enable') return;
+      if(el.dataset.diOrigDisabled === '1'){
+        el.disabled = true;
+      }
+    });
+  }
+
+  function onToggle(){
+    if(di.checked){
+      enableAllInDI();
+    }else{
+      // when turning off DI, restore original disabled states for its own controls
+      maybeRestoreOriginal();
+    }
+  }
+
+  di.addEventListener('change', onToggle);
+  // apply once on load
+  onToggle();
+});
+</script>
+
+
+<script>
+// hard guard: while Data Integrator is ON, Text/CW/Timer toggles cannot be turned on
+document.addEventListener('DOMContentLoaded', function(){
+  var di = document.getElementById('sasx_enable');
+  var t2 = document.getElementById('mod2_enable');
+  var cw = document.getElementById('cw_enable');
+  var tm = document.getElementById('timer_enable');
+  var clr = document.getElementById('clearAll');
+
+  function applyDIConstraints(){
+    if(!di) return;
+    var targets = [t2, cw, tm].filter(Boolean);
+    if(di.checked){
+      targets.forEach(function(tg){
+        if(!tg) return;
+        if(tg.checked){
+          tg.checked = false;
+          tg.dispatchEvent(new Event('change'));
+        }
+        tg.disabled = true;
+        tg.dataset.diLocked = '1';
+      });
+    }else{
+      targets.forEach(function(tg){
+        if(!tg) return;
+        if(tg.dataset.diLocked === '1'){
+          tg.disabled = false;
+          delete tg.dataset.diLocked;
+        }
+      });
+    }
+  }
+
+  if(di){
+    di.addEventListener('change', applyDIConstraints);
+    // prevent manual toggling while DI ON
+    [t2, cw, tm].forEach(function(tg){
+      if(!tg) return;
+      tg.addEventListener('change', function(){
+        if(di.checked && tg.checked){
+          tg.checked = false;
+          tg.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+    // initial
+    applyDIConstraints();
+  }
+
+  if(clr){
+    clr.addEventListener('click', function(){
+      // Clear must not change on/off rules
+      applyDIConstraints();
+    });
+  }
+});
+</script>
+
+
+<!-- rules script: safe inject after <body>, does not touch connect -->
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var di = document.getElementById('sasx_enable');
+  var t2 = document.getElementById('mod2_enable');
+  var cw = document.getElementById('cw_enable');
+  var tm = document.getElementById('timer_enable');
+  var saved = null;
+
+  function forceOff(tg){
+    if(!tg) return;
+    if(tg.checked){
+      tg.checked = false;
+      tg.dispatchEvent(new Event('change'));
+    }
+  }
+  function restore(){
+    if(!saved) return;
+    var map = {mod2: t2, cw: cw, timer: tm};
+    Object.keys(map).forEach(function(k){
+      var tg = map[k];
+      if(!tg) return;
+      var want = !!saved[k];
+      if(tg.checked !== want){
+        tg.checked = want;
+        tg.dispatchEvent(new Event('change'));
+      }
+    });
+    saved = null;
+  }
+
+  if(di){
+    di.addEventListener('change', function(){
+      if(di.checked){
+        saved = {mod2: !!(t2 && t2.checked), cw: !!(cw && cw.checked), timer: !!(tm && tm.checked)};
+        forceOff(t2); forceOff(cw); forceOff(tm);
+      }else{
+        restore();
+      }
+    });
+    if(di.checked){
+      saved = {mod2: !!(t2 && t2.checked), cw: !!(cw && cw.checked), timer: !!(tm && tm.checked)};
+      forceOff(t2); forceOff(cw); forceOff(tm);
+    }
+  }
+  var clr = document.getElementById('clearAll');
+  if(clr) clr.disabled = false;
+});
+</script>
+
+<div class="wrap">
+    <!-- Module 1 start -->
+    <div class="box mod1">
+      <div id="status" class="bar">Disconnected</div>
+    <!-- top row: connect + line + brightness -->
+    <div class="row">
+      <button id="btnConnect" class="btn g">Connect</button>
+      <button id="btnDisconnect" class="btn r" disabled>Disconnect</button>
+      <div class="spacer"></div>
+      <span id="fdsBadge" class="badge">FDS MLED</span>
+      <div class="spacer"></div>
+      <label>Line</label>
+      <select id="line"></select>
+      <div class="br-wrap"><span>MLED Brightness</span>
+  <div class="br-group">
+    <label><input type="radio" name="br" value="1" checked> 1</label>
+    <label><input type="radio" name="br" value="2"> 2</label>
+    <label><input type="radio" name="br" value="3"> 3</label>
+  </div>
+  <div class="br-slider" id="brSlider" data-pos="1">
+    <div class="knob"></div>
+    <button type="button" data-br="1">1</button>
+    <button type="button" data-br="2">2</button>
+    <button type="button" data-br="3">3</button>
+  </div>
+</div>
+    </div>
+
+    <!-- preview directly below top; left = payload text, right = active label -->
+    <div class="preview">
+      <div class="pv-row">
+        <div id="pvLeft" class="pv-left"></div>
+        <div id="pvRight" class="pv-right">Active: Idle</div>
+      </div>
+    </div>
+    </div><!-- /box mod1 -->
+
+    <!-- TEXT -->
+    <div class="box" id="mod2">
+    <div class="box-toggle"><label><input type="checkbox" id="mod2_enable" checked> Enable</label></div>
+    <div class="h">MLED Text</div>
+    <div class="ta-wrap"><textarea id="text" placeholder="max 64 bytes"></textarea><div id="counterIn" class="ta-counter">64 left</div></div>
+    <div class="row" id="counterRow" style="display:none"><span class="mut" id="counter">64 left</span></div>
+
+    <!-- below the text box: scroll left, color center, rainbow right -->
+    <div class="triple" style="margin-top:2px">
+      <div class="left">
+        <label>Scroll speed</label>
+        <label><input type="radio" name="sp" value="0" checked> 0</label>
+        <label><input type="radio" name="sp" value="1"> 1</label>
+        <label><input type="radio" name="sp" value="2"> 2</label>
+        <label><input type="radio" name="sp" value="3"> 3</label>
+      </div>
+      <div class="mid"><button id="send" class="btn g s" disabled>Send text</button></div>
+    
+      <div class="center">
+        <label>Text color</label>
+        <select id="txtColor"></select>
+      </div>
+      <div class="right">
+        <label for="rainbow">Rainbow</label>
+        <input id="rainbow" type="checkbox">
+      </div>
+    </div>
+    </div><!-- /box mod2 -->
+<!-- CW BEFORE Timer -->
+    <div class="box" id="modCW">
+    <div class="box-toggle"><label><input type="checkbox" id="cw_enable"> Enable</label></div>
+    <div class="h">Coursewalks</div>
+
+    <div class="triple" id="cwRow">
+      <div class="left">
+        <label><input type="radio" name="cwver" value="1" checked> CW1</label>
+        <label><input type="radio" name="cwver" value="2"> CW2</label>
+        <label><input type="radio" name="cwver" value="3"> CW3</label>
+        <label><input type="radio" name="cwver" value="4"> CW4</label>
+      </div>
+      <div class="center">
+        <button id="cwStart" class="btn g" disabled>Start</button>
+      </div>
+      
+      
+      <div class="right">
+        <label>CW duration:</label>
+        <select id="cwDuration">
+          <option value="7">7 min</option>
+          <option value="8">8 min</option>
+          <option value="9" selected>9 min</option>
+          <option value="10">10 min</option>
+        </select>
+        <span style="margin-left:16px"></span>
+        <label>Wait:</label>
+        <select id="cwWait">
+          <option value="10">10 s</option>
+          <option value="20" selected>20 s</option>
+          <option value="30">30 s</option>
+        </select>
+      </div>
+    </div>
+    </div><!-- /box modCW -->
+
+    <!-- TIMER -->
+<!-- TIMER -->
+    <div class="box" id="mod3">
+    <div class="box-toggle"><label><input type="checkbox" id="timer_enable"> Enable</label></div>
+    <div class="h">Countdown</div>
+
+    <div class="row">
+      <label>Count up</label>
+      <label style="margin-left:12px">Color</label>
+      <select id="upColor"></select>
+      <button id="upStart" class="btn g" disabled>Start</button>
+      <button id="upStop" class="btn r" disabled>Stop</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Count down</label>
+        <label class="mut">hh</label> <input id="downHH" type="number" min="0" max="1" value="0" style="width:60px"> <label style="margin-left:12px">mm</label>
+        <input id="downMM" type="number" min="0" max="99" value="10" style="width:70px">
+        <label>ss</label>
+        <input id="downSS" type="number" min="0" max="59" value="00" style="width:70px">
+        <label style="margin-left:12px">Color</label>
+        <select id="downColor"></select>
+      </div>
+      <button id="downStart" class="btn g" disabled>Start</button>
+      <button id="downStop" class="btn r" disabled>Stop</button>
+    </div>
+
+    <div class="row" style="gap:10px">
+      <label>After text</label>
+      <input id="afterText" type="text" maxlength="30" style="width:420px">
+      <span class="mut" id="afterCount">0/30</span>
+      <label style="margin-left:12px">Show (s)</label>
+      <input id="afterSecs" type="number" min="1" max="180" value="5" style="width:70px">
+      
+    </div></div><!-- /box mod3 -->
+<div style="margin:12px 0"><button id="clearAll" class="btn b full" disabled>Clear</button></div>
+
+
+    <!-- Module 4: Data Integrator -->
+    <div class="box" id="mod4">
+    <!-- ONLINA DATA INTEGRATOR (clean, isolated) -->
+    <div class="box-toggle"><label><input type="checkbox" id="sasx_enable"> Enable</label></div>
+    <div class="h">ONLINA DATA INTEGRATOR</div>
+    <div id="sasx_box" style="display:none;padding:6px 0">
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+        <label style="width:140px">Data source</label>
+        <select id="sasx_source" style="flex:1;min-width:260px">
+          <option value="manual" selected>Manual</option>
+          <option value="sas">JSON</option>
+          <option value="agigames">Agigames</option>
+            <option value="sasonline">SAS online</option>
+          </select>
+        <input id="sasx_file" type="file" accept="application/json" style="display:none" />
+        <span id="sasx_source_status" style="margin-left:10px; opacity:.85"></span>
+
+        <span id="sasx_source_hint" style="opacity:.7"></span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+        <label style="width:140px">DORSAL</label>
+        <input id="sasx_dorsal" type="text" inputmode="numeric" pattern="\d{1,3}" maxlength="3" placeholder="000-999" style="flex:1;min-width:260px">
+        <span style="opacity:.7">Line</span>
+        <select id="sasx_line_z1" style="width:72px"></select>
+        <button class="btn g s" id="sasx_send_z1">Send</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;flex-wrap:wrap">
+        <label style="width:140px">Handler + Dog</label>
+        <input id="sasx_handler" type="text" placeholder="Handler" style="flex:1;min-width:220px">
+        <input id="sasx_dog" type="text" placeholder="Dog" style="flex:1;min-width:220px">
+        <span style="opacity:.7">Line</span>
+        <select id="sasx_line_z2" style="width:72px"></select>
+        <button class="btn g s" id="sasx_send_z2">Send</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;flex-wrap:wrap">
+        <label style="width:140px">Score</label>
+        <input id="sasx_faults" type="number" min="0" step="1" value="0" style="width:110px">
+        <input id="sasx_refusals" type="number" min="0" max="3" step="1" value="0" style="width:110px">
+        <input id="sasx_elim" type="text" list="sasx_elim_list" placeholder="0 / 1 / yes / no / true / false" style="width:180px">
+        <datalist id="sasx_elim_list">
+          <option value="0"><option value="1"><option value="no"><option value="yes"><option value="false"><option value="true">
+        </datalist>
+        <span style="opacity:.7">Line</span>
+        <select id="sasx_line_z3" style="width:72px"></select>
+        <button class="btn g s" id="sasx_send_z3">Send</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+        <label style="width:140px">Country</label>
+        <input id="sasx_country" type="text" style="flex:1;min-width:260px">
+        <span style="opacity:.7">Line</span>
+        <select id="sasx_line_z4" style="width:72px"></select>
+        <button class="btn g s" id="sasx_send_z4">Send</button>
+      </div>
+    </div>
+    </div><!-- /box mod4 -->
+
+  
+    <div class="box" id="mod5">
+    <div class="box-toggle"><label><input type="checkbox" id="hdmiEnable"> Enable</label></div>
+    <div class="h">HDMI</div>
+    <div class="row" id="hdmiRow" style="gap:12px;align-items:center;flex-wrap:wrap">
+      
+      <button id="hdmiOpen" class="btn" disabled>Open output</button>
+      <button id="hdmiFullscreen" class="btn" disabled>Fullscreen</button>
+      <div class="spacer"></div>
+      <label>Background</label>
+      <select id="hdmiBg">
+        <option value="#000000" selected>Black</option>
+        <option value="#111111">Dark gray</option>
+        <option value="#ffffff">White</option>
+        <option value="#ef4444">Red</option>
+        <option value="#22c55e">Green</option>
+        <option value="#3b82f6">Blue</option>
+        <option value="#fde047">Yellow</option>
+        <option value="#22d3ee">Cyan</option>
+        <option value="#f472b6">Rose</option>
+      </select>
+      <label style="margin-left:12px">Font color</label>
+      <select id="hdmiFg">
+        <option value="#ffffff" selected>White</option>
+        <option value="#e5e7eb">Off-white</option>
+        <option value="#000000">Black</option>
+        <option value="#ef4444">Red</option>
+        <option value="#22c55e">Green</option>
+        <option value="#3b82f6">Blue</option>
+        <option value="#fde047">Yellow</option>
+        <option value="#22d3ee">Cyan</option>
+        <option value="#fb923c">Orange</option>
+        <option value="#60a5fa">Sky</option>
+        <option value="#a78bfa">Purple</option>
+      </select>
+      <label style="margin-left:12px">Font size</label>
+      <select id="hdmiFont">
+  <option value="64px">64 px</option>
+  <option value="80px">80 px</option>
+  <option value="96px">96 px</option>
+  <option value="120px">120 px</option>
+  <option value="160px">160 px</option>
+  <option value="180px">180 px</option>
+  <option value="200px">200 px</option>
+  <option value="240px">240 px</option>
+  <option value="280px">280 px</option>
+  <option value="320px" selected>320 px</option>
+</select>
+    </div>
+    <div id="hdmiPreviewBox" style="margin-top:10px;border:1px solid #333;border-radius:12px;padding:12px;width:100%;max-width:100%;overflow:hidden;background:#000;box-sizing:border-box">
+      <div id="hdmiPreview" style="color:#fff;font-size:96px;white-space:nowrap;letter-spacing:1px;text-align:center">HDMI preview</div>
+    </div>
+</div>
+    </div><!-- /box mod5 -->
+
+
+<script>
+(function(){
+  function setBoxEnabled(boxId, enabled){
+    const box = document.getElementById(boxId);
+    if(!box) return;
+    box.classList.toggle('disabled', !enabled);
+    const controls = box.querySelectorAll('input, select, textarea, button');
+    controls.forEach(el=>{
+      const isToggle = el.closest('.box-toggle') !== null;
+      const isClear = el.id === 'clearAll';
+      if(isToggle || isClear) return;
+      el.disabled = !enabled || el.disabled; // keep existing disabled if already true
+    });
+    // when enabling, re-enable those that were disabled only due to module off
+    if(enabled){
+      controls.forEach(el=>{
+        const isToggle = el.closest('.box-toggle') !== null;
+        const isClear = el.id === 'clearAll';
+        if(isToggle || isClear) return;
+        if(el.dataset._modoff === '1'){ el.disabled = false; delete el.dataset._modoff; }
+      });
+    }else{
+      controls.forEach(el=>{
+        const isToggle = el.closest('.box-toggle') !== null;
+        const isClear = el.id === 'clearAll';
+        if(isToggle || isClear) return;
+        if(!el.disabled){ el.dataset._modoff = '1'; el.disabled = true; }
+      });
+    }
+    // Clear button must always be enabled
+    const clr = document.getElementById('clearAll');
+    if(clr) clr.disabled = false;
+  }
+
+  function wireToggle(toggleId, boxId){
+    const tg = document.getElementById(toggleId);
+    if(!tg) return;
+    const apply = ()=> setBoxEnabled(boxId, tg.checked);
+    tg.addEventListener('change', apply);
+    apply();
+  }
+
+  // Initial wiring
+  document.addEventListener('DOMContentLoaded', ()=>{
+    wireToggle('mod2_enable', 'mod2');     // MLED Text default ON
+    wireToggle('cw_enable', 'modCW');      // CW default OFF
+    wireToggle('timer_enable', 'mod3');    // Timer default OFF
+    wireToggle('sasx_enable', 'mod4');     // Data integrator default OFF
+    wireToggle('hdmiEnable', 'mod5');      // HDMI default OFF
+
+    // Ensure status bar shows VID/PID and stays full width already handled in existing code
+    // Keep Clear always enabled
+    const clr = document.getElementById('clearAll');
+    if(clr){ clr.disabled = false; }
+  });
+})();
+
+// ---- Brightness slider sync ----
+(function(){
+  const slider = document.getElementById('brSlider');
+  if(!slider) return;
+  function currentBr(){ const r=[...document.querySelectorAll('input[name="br"]')].find(x=>x.checked); return r ? r.value : "1"; }
+  function setPos(val){ slider.dataset.pos = String(val); }
+  function setRadio(val){
+    const r = [...document.querySelectorAll('input[name="br"]')].find(x=>x.value===String(val));
+    if(r){ r.checked = true; }
+  }
+  setPos(currentBr());
+  slider.querySelectorAll('button[data-br]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ const v=btn.dataset.br; setRadio(v); setPos(v); });
+  });
+})();
+
+// ---- Improve status bar text after connect ----
+(function(){
+  const old = btnConnect && btnConnect.onclick;
+  if(old){
+    btnConnect.onclick = async ()=>{
+      try{
+        await old();
+      }catch(e){}
+      try{
+        const info = port?.getInfo?.();
+        let label = "";
+        if(info && (info.usbVendorId!=null || info.usbProductId!=null)){
+          const vid = info.usbVendorId!=null ? info.usbVendorId.toString(16) : "";
+          const pid = info.usbProductId!=null ? info.usbProductId.toString(16) : "";
+          label = `USB VID:${vid}${pid?` PID:${pid}`:""}`;
+        }
+        statusBar.textContent = label ? `Connected to ${label}` : "Connected";
+      }catch(e){}
+    };
+  }
+})();
+
+</script>
+
+<script>
+  // --- constants ---
+  const STX = 0x02, LF = 0x0A;
+  const COLORS = [
+    ["Default", null], ["Red",1],["Green",2],["Blue",3],["Yellow",4],
+    ["Magenta",5],["Cyan",6],["White",7],["Orange",8],["Deep pink",9],["Light Blue",10]
+  ];
+  const CSS_FOR_CODE = {
+    0:"#000000", 1:"#ef4444", 2:"#22c55e", 3:"#3b82f6", 4:"#fde047",
+    5:"#e879f9", 6:"#22d3ee", 7:"#fafafa", 8:"#fb923c", 9:"#f472b6", 10:"#60a5fa"
+  };
+  const RAINBOW_CODES = [1,2,3,4,5,6,7,8,9,10];
+  const BLUE = 3, PINK = 9;
+
+  const $ = sel => document.querySelector(sel);
+  const statusBar = $("#status");
+  const pvLeft = $("#pvLeft");
+  const pvRight = $("#pvRight");
+
+  // UI refs
+  const lineSel = $("#line"); const brRadios = [...document.querySelectorAll('input[name="br"]')];
+  const txtColor = $("#txtColor"); const txtArea = $("#text"); const counter = $("#counter");
+  const sendBtn = $("#send"); const rainbow = $("#rainbow"); const spRadios = [...document.querySelectorAll('input[name="sp"]')];
+  const upColor = $("#upColor"), upStart=$("#upStart"), upStop=$("#upStop");
+  const downMM=$("#downMM"), downSS=$("#downSS"), downColor=$("#downColor");
+  const downStart=$("#downStart"), downStop=$("#downStop");
+  const afterText=$("#afterText"), afterCount=$("#afterCount"), afterSecs=$("#afterSecs");
+  const clearAll=$("#clearAll");
+  const btnConnect=$("#btnConnect"), btnDisconnect=$("#btnDisconnect");
+
+  const cwStart=$("#cwStart");
+  const cwVerRadios = [...document.querySelectorAll('input[name="cwver"]')];
+  const cwDurationSel = document.getElementById("cwDuration");
+  const cwWaitSel = document.getElementById("cwWait");
+
+  // fill selects
+  for(let i=1;i<=15;i++){ const o=document.createElement("option");o.text=i;o.value=String(i); lineSel.appendChild(o); }
+  COLORS.forEach(([name])=>{
+    // txtColor: pełna lista, łącznie z "Default"
+    { const o=document.createElement("option"); o.text=name; o.value=name; txtColor.appendChild(o); }
+    // Timer: bez "Default"
+    if(name !== "Default"){
+      { const o=document.createElement("option"); o.text=name; o.value=name; upColor.appendChild(o); }
+      { const o=document.createElement("option"); o.text=name; o.value=name; downColor.appendChild(o); }
+    }
+  });
+  lineSel.value="7"; brRadios.find(r=>r.value==="1").checked=true; txtColor.value="Default"; upColor.value="Green"; downColor.value="Green";
+
+  // serial state
+  let port=null, writer=null;
+  let lockMode=null; // null | 'text' | 'up' | 'down' | 'cw'
+  let upTimer=null, upStartTs=0;
+  let scrollJob=null, scrollBuf="", scrollDelay=550, scrollColor=null, scrollIdx=0, scrollLen=0, scrollRainbow=false, rbIdx=0;
+  // down state
+  let downTimer=null, downEndTs=0, downColorCode=null;
+
+  // CW state
+  let cwTimers = []; let cwCancel = false;
+
+  // --- helpers ---
+  function encodeLatin1(str){
+    const len = str.length;
+    const out = new Uint8Array(len);
+    for(let i=0;i<len;i++){ out[i] = str.charCodeAt(i) & 0xFF; }
+    return out;
+  }
+  function frame(line, br, payload){
+    const bytes = [STX];
+    bytes.push(line.charCodeAt(0) & 0xFF);
+    bytes.push(br.charCodeAt(0) & 0xFF);
+    encodeLatin1(payload).forEach(b=>bytes.push(b));
+    bytes.push(LF);
+    return new Uint8Array(bytes);
+  }
+  function wrapColor(text, code){ return code==null ? text : `^cs ${code}^${text}^cs 0^`; }
+  function colorCodeByName(name){ return COLORS.find(([n])=>n===name)?.[1] ?? null; }
+  function cssByCode(code){ return CSS_FOR_CODE[code ?? 7] || "#e5e7eb"; }
+
+  // sanitize with Polish mapping + deaccent
+  function sanitize(s){
+    const map = {'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ż':'z','ź':'z','Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ż':'Z','Ź':'Z','ß':'ss','Æ':'AE','æ':'ae','Œ':'OE','œ':'oe'};
+    let out="";
+    for(const ch of s){
+      if(ch==='^'){ out+='*'; continue; }
+      const rep = map[ch] ?? ch;
+      out += rep.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E\xE0-\xFF]/g,'*');
+    }
+    return out;
+  }
+
+  function setPreviewSegments(segments){
+    pvLeft.innerHTML = "";
+    if(!segments || !segments.length){ return; }
+    for(const seg of segments){
+      const span = document.createElement("span");
+      span.className = "seg";
+      span.textContent = seg.text;
+      span.style.color = cssByCode(seg.code);
+      pvLeft.appendChild(span);
+    }
+  }
+  function setActiveLabel(name){ pvRight.textContent = `Active: ${name}`; pvRight.style.color = (name && name!=='Idle') ? 'var(--green)' : '#9ca3af'; }
+
+  function parsePreviewFromPayload(payload){
+    // basic parser for ^cs X^...^cs 0^
+    const segs = [];
+    let i=0, curColor=null, text="";
+    while(i<payload.length){
+      if(payload[i]==="^"){
+        if(payload.startsWith("^cs ", i)){
+          if(text){ segs.push({text, code:curColor}); text=""; }
+          const m = payload.slice(i).match(/^\^cs\s+(\d{1,2})\^/);
+          if(m){ curColor = Number(m[1]); i += m[0].length; continue; }
+        }
+        if(payload.startsWith("^cs 0^", i)){
+          if(text){ segs.push({text, code:curColor}); text=""; }
+          curColor = null; i += "^cs 0^".length; continue;
+        }
+        const end = payload.indexOf("^", i+1);
+        if(end>i){ i = end+1; continue; } else { break; }
+      }
+      text += payload[i]; i++;
+    }
+    if(text){ segs.push({text, code:curColor}); }
+    if(segs.length===0){ segs.push({text:payload.replace(/\^/g,""), code:null}); }
+    setPreviewSegments(segs);
+  }
+
+  async function sendPayload(payload){
+    if(!writer){ alert("Not connected"); return; }
+    if(payload.length>64){ alert("Payload >64"); return; }
+    const f = frame(lineSel.value, brRadios.find(r=>r.checked).value, payload);
+    await writer.write(f);
+    // preview
+    if(payload.startsWith("^rt ")){
+      const m = payload.match(/^\^rt\s+\d+\s+([0-9:.]+)\^/);
+      const disp = m ? m[1] : "";
+      setPreviewSegments([{text:disp, code:null}]);
+    }else{
+      parsePreviewFromPayload(payload);
+    }
+  }
+
+  function overheadFor(code){
+    return code==null ? 0 : (`^cs ${code}^`.length + `^cs 0^`.length);
+  }
+  function updateCounter(){
+    const shortText = txtArea.value.trim().length <= 8;
+    const code = (rainbow.checked && !shortText) ? 10 : colorCodeByName(txtColor.value);
+    const allowed = Math.max(0, 64 - overheadFor(code));
+    const s = txtArea.value;
+    if(s.length>allowed) txtArea.value = s.slice(0, allowed);
+    const left = allowed - txtArea.value.length;
+    const txt = `${left} left`;
+    const cnt = document.getElementById("counter");
+    if(cnt){ cnt.textContent = txt; cnt.style.color = left < 0 ? "#ef4444" : "var(--mut)"; }
+    const cin = document.getElementById("counterIn");
+    if(cin){ cin.textContent = txt; cin.style.color = left < 0 ? "#ef4444" : "var(--mut)"; }
+  }
+  txtArea.addEventListener("input", updateCounter);
+  txtColor.addEventListener("change", updateCounter);
+  rainbow.addEventListener("change", ()=>{
+    if(rainbow.checked){
+      const len = txtArea.value.trim().length;
+      if(len >= 9){
+        spRadios.find(r=>r.value==="1").checked=true;
+        spRadios.find(r=>r.value==="0").disabled=true;
+      }else{
+        spRadios.find(r=>r.value==="0").disabled=false;
+      }
+      txtColor.disabled=true;
+    }else{
+      spRadios.find(r=>r.value==="0").disabled=false;
+      txtColor.disabled=false;
+    }
+    updateCounter();
+  });
+  afterText.addEventListener("input", ()=> afterCount.textContent = `${afterText.value.length}/30` );
+
+  // connect / disconnect
+  btnConnect.onclick = async ()=>{
+    try{
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate:9600, dataBits:8, parity:"none", stopBits:1, flowControl:"none" });
+      writer = port.writable.getWriter();
+      btnDisconnect.disabled=false; btnConnect.disabled=true; btnConnect.classList.remove("g"); btnConnect.classList.add("gr");
+      statusBar.classList.add("ok");
+      let extra="";
+      try{
+        const info = port?.getInfo?.();
+        if(info && (info.usbVendorId!=null || info.usbProductId!=null)){
+          const vid = info.usbVendorId!=null ? info.usbVendorId.toString(16) : "";
+          const pid = info.usbProductId!=null ? info.usbProductId.toString(16) : "";
+          extra = ` (VID:${vid}${pid?` PID:${pid}`:""})`;
+        }
+      }catch(e){}
+      statusBar.textContent = extra ? ("Connected to " + extra.replace(/^[\s(]+|[)\s]+$/g,"")) : "Connected";
+// enable all buttons except Connect
+      document.querySelectorAll("button").forEach(btn=>{
+        if(btn.id!=="btnConnect") btn.disabled=false;
+      });
+      btnConnect.disabled=true;
+// welcome 1s: FDS MLED green
+      await sendPayload("^cs 2^FDS MLED^cs 0^");
+      setTimeout(()=> sendPayload(""), 1000);
+// welcome 1s: checker flag only
+      const fds = document.getElementById("fdsBadge"); if(fds){ fds.classList.add("ok"); }
+      setActiveLabel("Idle");
+    setCWLocked(false);
+      // welcome 1s: 5 green traffic lights
+      setTimeout(()=> sendPayload(""), 1000);
+setTimeout(()=> sendPayload(""), 1000);
+    }catch(e){ console.error(e); alert("Connect error"); }
+  };
+  btnDisconnect.onclick = async ()=>{
+    try{
+      stopScroll(); stopUp(); cwStopAll();
+      if(writer){ writer.releaseLock(); writer=null; }
+      if(port){ await port.close(); port=null; }
+    }catch{}
+    btnDisconnect.disabled=true; btnConnect.disabled=false; btnConnect.classList.remove("gr"); btnConnect.classList.add("g");
+    statusBar.classList.remove("ok"); statusBar.textContent = "Disconnected";
+    const fds = document.getElementById("fdsBadge"); if(fds){ fds.classList.remove("ok"); }
+    setActiveLabel("Idle"); setPreviewSegments([]);
+  };
+
+  // lock and active label
+  function setLock(mode){ lockMode = mode; }
+  function setCWLocked(on){
+    const nodes = Array.from(document.querySelectorAll('input, select, textarea, button'));
+    nodes.forEach(el=>{
+      if(el.id==='clearAll' || el.id==='btnDisconnect') return;
+      if(on){ el.dataset.prevDisabled = el.disabled?'1':'0'; el.disabled = true; }
+      else{
+        if(el.dataset.prevDisabled==='1'){ el.disabled = true } else { el.disabled = false; }
+        delete el.dataset.prevDisabled;
+      }
+    });
+    const clr=document.getElementById('clearAll'); if(clr) clr.disabled = false;
+    const disc=document.getElementById('btnDisconnect'); if(disc) disc.disabled = false;
+  }
+  function ensureLock(need){
+    if(lockMode && lockMode!==need){ alert("Clear first"); return false; }
+    if(!lockMode) setLock(need);
+    const nameMap = {text:"MLED Text", up:"Timer", down:"Timer", cw:"Coursewalks"};
+    setActiveLabel(nameMap[need] || "Idle");
+    return true;
+  }
+
+  // text send
+  function nextRainbowColor(){ const c = RAINBOW_CODES[rbIdx]; rbIdx=(rbIdx+1)%RAINBOW_CODES.length; return c; }
+  function sendTextOnce(text, colorOverride=null){
+    const code = colorOverride ?? colorCodeByName(txtColor.value);
+    let s = sanitize(text);
+    const max = 64 - overheadFor(code);
+    if(s.length>max) s = s.slice(0, max);
+    const payload = wrapColor(s, code);
+    sendPayload(payload);
+  }
+  function startScroll(text, colorOverride=null, rainbowCycle=false){
+    stopScroll();
+    let s = sanitize(text);
+    const code = colorOverride ?? colorCodeByName(txtColor.value);
+    const max = 64 - overheadFor(code);
+    if(s.length>max) s = s.slice(0, max);
+    scrollBuf = s + "   ";
+    const sp = Number(spRadios.find(r=>r.checked).value);
+    scrollDelay = {1:550,2:350,3:220}[sp] || 550;
+    scrollColor = code;
+    scrollLen = scrollBuf.length; scrollIdx=0; scrollRainbow = rainbowCycle;
+    if(sp===0){ sendTextOnce(s, code); return; }
+    scrollStep();
+  }
+  function scrollStep(){
+    if(!scrollBuf) return;
+    scrollBuf = scrollBuf.slice(1) + scrollBuf[0];
+    const chunk = scrollBuf.slice(0, 64 - overheadFor(scrollColor));
+    sendTextOnce(chunk, scrollColor);
+    scrollIdx = (scrollIdx+1)%scrollLen;
+    if(scrollRainbow && scrollIdx===0){ scrollColor = nextRainbowColor(); }
+    scrollJob = setTimeout(scrollStep, scrollDelay);
+  }
+  function stopScroll(){ if(scrollJob){ clearTimeout(scrollJob); scrollJob=null; } scrollBuf=""; }
+
+  sendBtn.onclick = ()=>{
+    if(!ensureLock("text")) return;
+    const text = txtArea.value.trim();
+    if(!text){ alert("Empty text"); return; }
+    stopScroll();
+    if(rainbow.checked){
+      if(text.length >= 9){
+        startScroll(text, nextRainbowColor(), true);
+      }else{
+        sendTextOnce(text, nextRainbowColor());
+      }
+      return;
+    }
+    const sp = Number(spRadios.find(r=>r.checked).value);
+    if(sp>0) startScroll(text);
+    else sendTextOnce(text);
+  };
+
+  // clear
+  function cwStopAll(){
+    cwCancel = true;
+    cwTimers.forEach(id=>clearTimeout(id));
+    cwTimers = [];
+  }
+  clearAll.onclick = ()=>{ setCWLocked(false);
+    stopScroll(); stopUp(); stopDown(); cwStopAll();
+    setLock(null);
+    setActiveLabel("Idle");
+    sendPayload("");
+    setPreviewSegments([]);
+  };
+
+  // up timer
+  function tickUp(){
+    const now = performance.now();
+    const elapsed = Math.max(0, (now - upStartTs)/1000);
+    const mm = Math.floor(elapsed/60);
+    const ss = Math.floor(elapsed%60);
+    const cc = Math.floor((elapsed - Math.floor(elapsed))*100);
+    const text = mm===0 ? `${String(ss).padStart(2,'0')}.${String(cc).padStart(2,'0')}`
+                        : `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}.${String(cc).padStart(2,'0')}`;
+    const code = colorCodeByName(upColor.value);
+    sendPayload(wrapColor(text, code));
+    upTimer = setTimeout(tickUp, 100);
+  }
+  function stopUp(){ if(upTimer){ clearTimeout(upTimer); upTimer=null;   // auto-clear after 30s
+  setTimeout(()=>{
+    sendPayload("");
+    setLock(null);
+    setActiveLabel("Idle");
+    setPreviewSegments([]);
+  }, 30000);
+} }
+  upStart.onclick = ()=>{ if(!ensureLock("up")) return; stopUp(); upStartTs=performance.now(); tickUp(); };
+  upStop.onclick  = ()=>{ stopUp(); };
+
+  // down
+  function tickDown(){
+    if(!downTimer) return;
+    const now = performance.now();
+    const remainSec = Math.max(0, Math.floor((downEndTs - now)/1000));
+    const h = Math.floor(remainSec/3600);
+    const m = Math.floor((remainSec%3600)/60);
+    const s = remainSec % 60;
+    const fmt = h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+    setPreviewSegments([{text:fmt, code:downColorCode}]);
+    if(remainSec<=0){ stopDown(); showAfterText(); }else{
+      downTimer = setTimeout(tickDown, 250);
+    }
+  }
+  function stopDown(){
+    if(downTimer){ clearTimeout(downTimer); downTimer=null; }
+  }
+  downStart.onclick = ()=>{
+    if(!ensureLock("down")) return;
+    stopUp(); stopDown();
+    const hh = Number((document.getElementById('downHH')?.value)||0), mm = Number(downMM.value||0), ss = Number(downSS.value||0);
+    const total = hh*3600 + mm*60 + ss;
+    const fmt = (hh>0)?`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`:`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    downColorCode = colorCodeByName(downColor.value);
+    // device countdown
+    sendPayload(wrapColor(`^rt 2 ${fmt}^`, downColorCode));
+    // local preview mirror
+    downEndTs = performance.now() + total*1000;
+    downTimer = setTimeout(tickDown, 10);
+  };
+  downStop.onclick = ()=>{
+    if(lockMode!=="down") return;
+    // freeze value: compute current remain and send as static text
+    const now = performance.now();
+    const remainSec = Math.max(0, Math.floor((downEndTs - now)/1000));
+    const h = Math.floor(remainSec/3600);
+    const m = Math.floor((remainSec%3600)/60);
+    const s = remainSec % 60;
+    const fmt = h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+    stopDown();
+    sendPayload(wrapColor(fmt, downColorCode));
+    // keep lock until Clear
+  };
+
+  // disconnect auto
+  navigator.serial?.addEventListener("disconnect", async ()=>{
+    try{ if(writer){ writer.releaseLock(); writer=null; } if(port){ await port.close(); port=null; } }catch{}
+    btnDisconnect.disabled=true; btnConnect.disabled=false;
+    statusBar.classList.remove("ok"); statusBar.textContent = "Disconnected";
+    setActiveLabel("Idle"); setPreviewSegments([]);
+  });
+
+  // -------- Coursewalks logic --------
+  function cwLabel(i, n){ return `${i}/${n}`; }
+  function dualColor(leftText, leftCode, rightText, rightCode){
+    return `^cs ${leftCode}^${leftText}^cs 0^ ^cs ${rightCode}^${rightText}^cs 0^`;
+  }
+  function mixColor(label, num, labelCode, numCode){
+    return `^cs ${labelCode}^${label}^cs 0^ ^cs ${numCode}^${num}^cs 0^`;
+  }
+  function sleep(ms){ return new Promise(res=>{ const id=setTimeout(res, ms); cwTimers.push(id); }); }
+  function fmtMSS(totalSeconds){
+    const m = Math.floor(totalSeconds/60);
+    const s = totalSeconds%60;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  async function cwRunOne(label, minutes){
+    if(cwCancel) return;
+    const soonPayload = dualColor(label, 3, "soon", 2);
+    await sendPayload(soonPayload);
+    setActiveLabel("Coursewalks");
+    await sleep((Number(cwWaitSel && cwWaitSel.value || 20)) * 1000);
+    if(cwCancel) return;
+    let seconds = Math.max(0, Math.floor(minutes*60));
+    for(let t=seconds; t>=1; t--){
+      if(cwCancel) return;
+      const disp = fmtMSS(t);
+      await sendPayload( mixColor(label, disp, 3, 9) );
+      await sleep(1000);
+    }
+    if(cwCancel) return;
+    const endPayload = dualColor(label, 3, "END", 1);
+    await sendPayload(endPayload);
+    await sleep((Number(cwWaitSel && cwWaitSel.value || 20)) * 1000);
+    if(cwCancel) return;
+    }
+
+  async function runCoursewalk(n, minutes){
+    if(!ensureLock("cw")) return;
+    cwCancel = false; cwTimers = [];
+    for(let i=1;i<=n;i++){
+      if(cwCancel) break;
+      const label = cwLabel(i,n);
+      await cwRunOne(label, minutes);
+    }
+    setLock(null);
+    setActiveLabel("Idle");
+  }
+
+  cwStart.onclick = ()=>{ setCWLocked(true);
+    const ver = Number(cwVerRadios.find(r=>r.checked).value);
+    const mins = Number(Number(cwDurationSel && cwDurationSel.value));
+    runCoursewalk(ver, mins);
+  };
+
+  // init
+  updateCounter();
+
+function showAfterText(){
+  const txt = sanitize(afterText.value || "");
+  const secs = Math.min(180, Math.max(1, Number(afterSecs.value||5)));
+  if(!txt){
+    setLock(null); setActiveLabel("Idle"); sendPayload(""); setPreviewSegments([]);
+    return;
+  }
+  const code = downColorCode;
+  sendPayload(wrapColor(txt, code));
+  setPreviewSegments([{text:txt, code}]);
+  setTimeout(()=>{
+    sendPayload("");
+    setLock(null);
+    setActiveLabel("Idle");
+    setPreviewSegments([]);
+  }, secs*1000);
+}
+
+
+// duration tools
+const appStart = Date.now();
+function fmtDuration(ms){
+  const totalSec = Math.floor(ms/1000);
+  const h = Math.floor(totalSec/3600);
+  const m = Math.floor((totalSec%3600)/60);
+  const s = totalSec%60;
+  return h+":"+(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+}
+const btnShowDuration = document.getElementById("btnShowDuration");
+if(btnShowDuration){
+  btnShowDuration.onclick = ()=>{
+    const dur = fmtDuration(Date.now()-appStart);
+    const payload = `^cs 2^${dur}^cs 0^`;
+    sendPayload(payload);
+    setPreviewSegments([{text:dur, code:2}]);
+  };
+}
+
+
+// duration tools (ensure single init)
+if(!window.__duration_init__){
+  window.__duration_init__ = true;
+  window.appStart = window.appStart || Date.now();
+  function fmtDuration(ms){
+    const totalSec = Math.floor(ms/1000);
+    const h = Math.floor(totalSec/3600);
+    const m = Math.floor((totalSec%3600)/60);
+    const s = totalSec%60;
+    return h+":"+(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  }
+  const btnShowDuration = document.getElementById("btnShowDuration");
+  if(btnShowDuration){
+    btnShowDuration.onclick = ()=>{
+      const dur = fmtDuration(Date.now()-window.appStart);
+      const payload = `^cs 2^${dur}^cs 0^`;
+      sendPayload(payload);
+      setPreviewSegments([{text:dur, code:2}]);
+    };
+  }
+}
+
+
+
+  // HDMI module. Nie dotyka connect.
+  let hdmiEnabled = false;
+  let hdmiWin = null;
+
+  function hdmiApplyStyles(){
+    const box = document.getElementById("hdmiPreviewBox");
+    const txt = document.getElementById("hdmiPreview");
+    const bgSel = document.getElementById("hdmiBg");
+    const fgSel = document.getElementById("hdmiFg");
+    const fsSel = document.getElementById("hdmiFont");
+    const bg = bgSel ? bgSel.value : "#000";
+    const fg = fgSel ? fgSel.value : "#fff";
+    const fs = fsSel ? fsSel.value : "96px";
+
+    if(box) box.style.background = bg;
+    if(txt){
+      txt.style.color = fg;
+      txt.style.fontSize = fs;
+      txt.style.whiteSpace = "nowrap";
+      txt.style.letterSpacing = "1px";
+      txt.style.textAlign = "center";
+      txt.style.fontFamily = "Helvetica,Arial,sans-serif";
+    }
+    if(hdmiWin && !hdmiWin.closed){
+      const d = hdmiWin.document;
+      d.body.style.background = bg;
+      const wrap = d.getElementById("hdmiWrap");
+      const el = d.getElementById("hdmiText");
+      if(wrap){
+        wrap.style.width = "100vw";
+        wrap.style.height = "100vh";
+        wrap.style.display = "flex";
+        wrap.style.alignItems = "center";
+        wrap.style.justifyContent = "center";
+        wrap.style.background = bg;
+      }
+      if(el){
+        el.style.color = fg;
+        el.style.fontSize = fs;
+        el.style.whiteSpace = "nowrap";
+        el.style.letterSpacing = "1px";
+        el.style.textAlign = "center";
+        el.style.fontFamily = "Helvetica,Arial,sans-serif";
+      }
+    }
+  }
+
+  function hdmiRender(text){
+    const txt = document.getElementById("hdmiPreview");
+    if(txt) txt.textContent = text || "";
+    if(hdmiWin && !hdmiWin.closed){
+      const el = hdmiWin.document.getElementById("hdmiText");
+      if(el) el.textContent = text || "";
+    }
+  }
+
+  function hdmiOpenWindow(){
+    if(!hdmiEnabled){ alert("HDMI disabled"); return; }
+    const w = window.open("about:blank", "MLED_HDMI");
+    if(!w){ alert("Pop up blocked"); return; }
+    hdmiWin = w;
+    const bgSel = document.getElementById("hdmiBg");
+    const fgSel = document.getElementById("hdmiFg");
+    const fsSel = document.getElementById("hdmiFont");
+    const bg = bgSel ? bgSel.value : "#000";
+    const fg = fgSel ? fgSel.value : "#fff";
+    const fs = fsSel ? fsSel.value : "96px";
+    const htmlDoc = `<!doctype html>
+<html><head><meta charset="utf-8"><title>HDMI Output</title>
+<style>
+html,body,#hdmiWrap{width:100vw;height:100vh;margin:0}
+#hdmiWrap{display:flex;align-items:center;justify-content:center;background:${bg}}
+#hdmiText{font-family:Helvetica,Arial,sans-serif;white-space:nowrap;letter-spacing:1px;text-align:center;color:${fg};font-size:${fs}}
+</style>
+</head><body><div id="hdmiWrap"><div id="hdmiText"></div></div></body></html>`;
+    w.document.open(); w.document.write(htmlDoc); w.document.close();
+    try{ w.focus(); }catch(e){}
+  }
+
+  function hdmiFullscreen(){
+    if(!hdmiEnabled){ return; }
+    if(!hdmiWin || hdmiWin.closed){ hdmiOpenWindow(); }
+    try{
+      const de = hdmiWin.document.documentElement;
+      if(de.requestFullscreen) de.requestFullscreen();
+    }catch(e){}
+  }
+
+  window.addEventListener("DOMContentLoaded", ()=>{
+    const en = document.getElementById("hdmiEnable");
+    const openBtn = document.getElementById("hdmiOpen");
+    const fsBtn = document.getElementById("hdmiFullscreen");
+    const bgSel = document.getElementById("hdmiBg");
+    const fgSel = document.getElementById("hdmiFg");
+    const fsSel = document.getElementById("hdmiFont");
+
+    if(en){
+      hdmiEnabled = en.checked;
+      if(openBtn) openBtn.disabled = !hdmiEnabled;
+      if(fsBtn) fsBtn.disabled = !hdmiEnabled;
+      en.addEventListener("change", ()=>{
+        hdmiEnabled = en.checked;
+        if(openBtn) openBtn.disabled = !hdmiEnabled;
+        if(fsBtn) fsBtn.disabled = !hdmiEnabled;
+        if(!hdmiEnabled){ hdmiRender(""); }
+      });
+    }
+    if(openBtn){ openBtn.addEventListener("click", hdmiOpenWindow); }
+    if(fsBtn){ fsBtn.addEventListener("click", hdmiFullscreen); }
+    [bgSel, fgSel, fsSel].forEach(el=>{ if(el) el.addEventListener("change", hdmiApplyStyles); });
+    hdmiApplyStyles();
+  });
+
+  // Lustrzane odbicie z podglądu. Nie rusza wysyłki ani connect.
+  if(typeof window.setPreviewSegments === "function"){
+    const __orig_setPreviewSegments = window.setPreviewSegments;
+    window.setPreviewSegments = function(segments){
+      __orig_setPreviewSegments(segments);
+      try{
+        if(hdmiEnabled){
+          const text = (segments || []).map(s => s.text).join("");
+          hdmiRender(text);
+        }
+      }catch(e){}
+    };
+  }
+
+
+// --- unified box ON/OFF controller (keeps toggles + Clear active) ---
+(function(){
+  const pairs = [
+    ['mod2','mod2_enable'],   // MLED Text
+    ['modCW','cw_enable'],    // Coursewalks
+    ['mod3','timer_enable'],  // Countdown
+    ['mod4','sasx_enable'],   // Data Integrator
+    ['mod5','hdmiEnable']     // HDMI
+  ];
+  function wire(boxId, toggleId){
+    const box = document.getElementById(boxId);
+    const t = document.getElementById(toggleId);
+    if(!box || !t) return;
+    const update = ()=>{
+      const on = !!t.checked;
+      box.classList.toggle('disabled', !on);
+      box.querySelectorAll('input,select,textarea,button').forEach(el=>{
+        // leave module toggle and Clear active
+        if(el === t) return;
+        if(el.closest('.box-toggle')) return;
+        if(el.id === 'clearAll') return;
+        el.disabled = !on;
+      });
+    };
+    t.addEventListener('change', update);
+    // apply once now
+    update();
+  }
+  pairs.forEach(p=>wire(p[0], p[1]));
+})(); 
+// --- end controller ---
+// enforce OFF state after Clear: re-apply disabled/enabled states based on toggles
+(function(){
+  const pairs = [
+    ['mod2','mod2_enable'],
+    ['modCW','cw_enable'],
+    ['mod3','timer_enable'],
+    ['mod4','sasx_enable'],
+    ['mod5','hdmiEnable']
+  ];
+  function applyOne(boxId, toggleId){
+    const box = document.getElementById(boxId);
+    const t = document.getElementById(toggleId);
+    if(!box || !t) return;
+    const on = !!t.checked;
+    box.classList.toggle('disabled', !on);
+    box.querySelectorAll('input,select,textarea,button').forEach(el=>{
+      if(el === t) return;
+      if(el.closest('.box-toggle')) return;
+      if(el.id === 'clearAll') return;
+      el.disabled = !on;
+    });
+  }
+  function applyAll(){
+    pairs.forEach(p => applyOne(p[0], p[1]));
+  }
+  const clr = document.getElementById('clearAll');
+  if(clr){
+    clr.addEventListener('click', ()=>{
+      // wait a tick in case Clear toggles anything internally, then re-apply
+      setTimeout(applyAll, 0);
+    });
+  }
+  // also re-apply when window regains focus (defensive)
+  window.addEventListener('focus', applyAll);
+})();
+
+// --- enforce OFF after Clear more robustly ---
+(function(){
+  const pairs = [
+    ['mod2','mod2_enable'],
+    ['modCW','cw_enable'],
+    ['mod3','timer_enable'],
+    ['mod4','sasx_enable'],
+    ['mod5','hdmiEnable']
+  ];
+  function applyOne(boxId, toggleId){
+    const box = document.getElementById(boxId);
+    const t = document.getElementById(toggleId);
+    if(!box || !t) return;
+    const on = !!t.checked;
+    box.classList.toggle('disabled', !on);
+    box.querySelectorAll('input,select,textarea,button').forEach(el=>{
+      // keep only module toggle and Clear active
+      if(el === t) return;
+      if(el.closest && el.closest('.box-toggle')) return;
+      if(el.id === 'clearAll') return;
+      el.disabled = !on;
+    });
+  }
+  function applyAll(){
+    pairs.forEach(p => applyOne(p[0], p[1]));
+  }
+  const clr = document.getElementById('clearAll');
+  if(clr){
+    clr.addEventListener('click', ()=>{
+      // other code may re-enable controls; enforce our state a few times
+      applyAll();
+      setTimeout(applyAll, 0);
+      setTimeout(applyAll, 50);
+      setTimeout(applyAll, 200);
+    });
+  }
+})(); 
+// --- end enforce OFF ---
+</script>
+
+<!-- SASX module (clean, only SAS) -->
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  const on = (el, ev, fn)=> el && el.addEventListener(ev, fn);
+
+  // --- ASCII/diacritics normalization for Handler/Dog ---
+  function asciiize(input){
+    if(!input) return '';
+    const map = {
+      'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z',
+      'Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z',
+      'ß':'ss','Æ':'AE','æ':'ae','Œ':'OE','œ':'oe','Ø':'O','ø':'o','Đ':'D','đ':'d',
+      'Þ':'Th','þ':'th','Ð':'D','ð':'d'
+    };
+    let s = String(input);
+    s = s.replace(/[ĄĆĘŁŃÓŚŹŻąćęłńóśźżßÆæŒœØøĐđÞþÐð]/g, ch => map[ch] || ch);
+    s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    s = s.replace(/[^\x20-\x7E]/g, '');
+    return s;
+  }
+  function stripCtl(s){
+    return String(s||'').replaceAll('^','').replaceAll('~','').replaceAll('|','').replaceAll('\u001b','');
+  }
+  function cleanText(s){ return asciiize(stripCtl(s)); }
+
+  // Data source selector
+  const sourceSel = document.getElementById('sasx_source');
+  let sasxSource = sourceSel ? sourceSel.value : 'manual';
+  function refreshSourceHint(){
+    const hint = document.getElementById('sasx_source_hint');
+    if(!hint) return;
+    if(sasxSource==='manual') hint.textContent = 'manual';
+    else if(sasxSource==='sas') hint.textContent = 'ONLINA DATA INTEGRATOR';
+    else if(sasxSource==='agigames') hint.textContent = 'Agigames';
+    else hint.textContent = '';
+  }
+  if(sourceSel){
+    sourceSel.addEventListener('change', ()=>{ sasxSource = sourceSel.value || 'manual'; refreshSourceHint(); });
+    refreshSourceHint();
+  }
+  // expose for future logic
+  window.sasxSource = ()=> sasxSource;
+
+  // disable/enable SAS manual Send buttons when ONLINA DATA INTEGRATOR is active
+  function setSasManualButtons(dis){
+    ['sasx_send_z1','sasx_send_z2','sasx_send_z3','sasx_send_z4'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.disabled = !!dis;
+    });
+  }
+  // apply once on init
+  setSasManualButtons(sasxSource==='sas');
+
+
+  // === ONLINA DATA INTEGRATOR: local JSON polling ===
+  let sasPollTimer = null;
+  let sasFileHandle = null;
+  const sasFileInput = document.getElementById('sasx_file');
+  const statusEl = document.getElementById('sasx_source_status');
+
+  function sasSetStatus(msg){
+    if(statusEl){ statusEl.textContent = msg || ''; }
+  }
+
+  async function sasPickFile(){
+    // Try File System Access API first (works best for re-reading changed files)
+    try{
+      if(window.showOpenFilePicker){
+        const [handle] = await window.showOpenFilePicker({types:[{description:'JSON', accept:{'application/json':['.json']}}]});
+        sasFileHandle = handle;
+        sasSetStatus('file: ' + handle.name);
+        return true;
+      }
+    }catch(e){
+      // fall through to <input type=file>
+    }
+    // Fallback: input type=file
+    return new Promise((resolve)=>{
+      if(!sasFileInput) return resolve(false);
+      const onChange = ()=>{
+        sasFileInput.removeEventListener('change', onChange);
+        if(sasFileInput.files && sasFileInput.files[0]){
+          sasSetStatus('file: ' + sasFileInput.files[0].name);
+          resolve(true);
+        }else{
+          resolve(false);
+        }
+      };
+      sasFileInput.addEventListener('change', onChange, {once:true});
+      sasFileInput.click();
+    });
+  }
+
+  async function sasReadTextOnce(){
+    try{
+      if(sasFileHandle && sasFileHandle.getFile){
+        const file = await sasFileHandle.getFile();
+        return await file.text();
+      }
+      if(sasFileInput && sasFileInput.files && sasFileInput.files[0]){
+        const f = sasFileInput.files[0];
+        if(f.text) return await f.text();
+        // legacy: FileReader
+        return await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result||'')); r.onerror=rej; r.readAsText(f); });
+      }
+    }catch(e){
+      throw e;
+    }
+    throw new Error('no file selected');
+  }
+
+  function mapSasJsonToFields(obj){
+    try{
+      const dorsal = (obj.dorsal ?? '').toString();
+      const handler = (obj.handler ?? '').toString();
+      const dog = (obj.dog_name ?? '').toString();
+      const country = (obj.country ?? '').toString();
+      const refusals = Number.isFinite(obj.refusals) ? obj.refusals : (obj.refusals==null?0:Number(obj.refusals)||0);
+      const faults = Number.isFinite(obj.errors) ? obj.errors : (obj.errors==null?0:Number(obj.errors)||0);
+      const elim = !!(obj.disqualified === true || String(obj.disqualified).toLowerCase() in {'1':1,'yes':1,'true':1});
+      // fill inputs
+      const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value = val; };
+      set('sasx_dorsal', dorsal);
+      set('sasx_handler', handler);
+      set('sasx_dog', dog);
+      set('sasx_country', country);
+      set('sasx_refusals', String(refusals));
+      set('sasx_faults', String(faults));
+      set('sasx_elim', elim ? '1' : '0');
+    }catch(e){ console.warn('map error', e); }
+  }
+
+  async function sasPollOnce(){
+    try{
+      const txt = await sasReadTextOnce();
+      const obj = JSON.parse(txt);
+      mapSasJsonToFields(obj);
+      await sasAutoSendFromInputsIfChanged();
+      const ts = (new Date()).toLocaleTimeString();
+      sasSetStatus('OK ' + ts);
+    }catch(e){
+      sasSetStatus('err: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function sasStartPolling(){
+    sasStopPolling();
+    sasPollOnce();
+    sasPollTimer = setInterval(sasPollOnce, 1000);
+  }
+  function sasStopPolling(){
+    if(sasPollTimer){ clearInterval(sasPollTimer); sasPollTimer = null; }
+  }
+
+  async function sasEnableOnline(){
+    const ok = await sasPickFile();
+    if(ok){ sasStartPolling(); } else { sasSetStatus('file not selected'); }
+  }
+  function sasDisableOnline(){
+    sasStopPolling();
+    sasSetStatus('');
+    sasFileHandle = null;
+  }
+
+  
+  // === Auto-send on change (ONLINA DATA INTEGRATOR) ===
+  const sasLast = {z1:'', z2:'', z3:'', z4:''};
+  function eq(a,b){ return String(a||'')===String(b||''); }
+  async function sasAutoSendFromInputsIfChanged(){
+    if((window.sasxSource && window.sasxSource()!=='sas')) return;
+    // require writer (connected)
+    if(typeof writer === 'undefined' || !writer) return;
+    const clean = (s)=> cleanText(s);
+    // Z1 dorsal
+    try{
+      const line1 = document.getElementById('sasx_line_z1')?.value || '1';
+      const draw = (document.getElementById('sasx_dorsal')?.value||'').trim().replace(/\D/g,'');
+      if(draw){
+        const dd = String(Math.min(999, parseInt(draw,10))).padStart(3,'0');
+        const p1 = '^cp 1 4 7^' + san(dd);
+        if(!eq(p1, sasLast.z1)){
+          await sendTo(line1, p1);
+          sasLast.z1 = p1;
+        }
+      }
+    }catch(e){ /*noop*/ }
+
+    // Z2 handler + dog
+    try{
+      const line2 = document.getElementById('sasx_line_z2')?.value || '2';
+      const h = document.getElementById('sasx_handler')?.value || '';
+      const d = document.getElementById('sasx_dog')?.value || '';
+      const handler = clean(h), dog = clean(d);
+      let p2 = '';
+      if(handler || dog){
+        const hl = handler.length + 1, dl = dog.length;
+        p2 = `^cp 1 ${hl} 7^${handler} ^cp ${hl} ${hl+dl} 8^${dog}`;
+        if(p2.length>64){ p2 = `^cs 7^${handler.slice(0,58)}`; }
+      }
+      if(!eq(p2, sasLast.z2)){
+        // clear then write (even empty to clear)
+        await sendTo(line2, '');
+        if(p2) await sendTo(line2, p2);
+        sasLast.z2 = p2;
+      }
+    }catch(e){ /*noop*/ }
+
+    // Z3 score / DIS
+    try{
+      const line3 = document.getElementById('sasx_line_z3')?.value || '3';
+      const f = Number(document.getElementById('sasx_faults')?.value || 0);
+      let r = Number(document.getElementById('sasx_refusals')?.value || 0);
+      const e = String(document.getElementById('sasx_elim')?.value||'').trim().toLowerCase();
+      const yes = (v)=> v==='1' || v==='yes' || v==='true';
+      let p3 = '';
+      if(yes(e)){
+        p3 = '^fd 5 1^^cp 1 10 1^  DIS^ic 3 1 2^^ic 3 1 11^';
+      }else{
+        if(!Number.isInteger(r) || r<0) r=0; if(r>3){ r=3; }
+        const fd = (!f) ? '^cp 1 2 2^ F^ic 3 2^^cp 3 5 2^' : `^cp 1 3 1^ F${f} `;
+        const rd = (!r) ? '^cp 4 5 2^R^ic 3 2^' : `^cp 5 9 1^R${r}`;
+        p3 = fd + rd;
+      }
+      if(!eq(p3, sasLast.z3)){
+        await sendTo(line3, p3);
+        sasLast.z3 = p3;
+      }
+    }catch(e){ /*noop*/ }
+
+    // Z4 country
+    try{
+      const line4 = document.getElementById('sasx_line_z4')?.value || '4';
+      const c = (document.getElementById('sasx_country')?.value || '').trim();
+      const p4 = c ? '^cp 1 3 7^' + san(c) : '^cp 1 3 7^';
+      if(!eq(p4, sasLast.z4)){
+        await sendTo(line4, ''); // clear first
+        await sendTo(line4, p4);
+        sasLast.z4 = p4;
+      }
+    }catch(e){ /*noop*/ }
+  }
+
+  // Hook into source change
+  if(sourceSel){
+    sourceSel.addEventListener('change', async ()=>{
+      if(sourceSel.value === 'sas'){ setSasManualButtons(true); await sasEnableOnline(); await sasAutoSendFromInputsIfChanged(); }
+      else { setSasManualButtons(false); sasDisableOnline(); }
+    });
+  }
+
+
+
+  // show/hide only, no touching Clear/Connect
+  on($('sasx_enable'), 'change', ()=>{
+    $('sasx_box').style.display = $('sasx_enable').checked ? 'block' : 'none';
+  });
+
+  // defaults and fill
+  function fillLines(selId, def){ const s=$(selId); for(let i=1;i<=15;i++){ const o=document.createElement('option'); o.value=i; o.textContent=i; s.appendChild(o);} s.value=String(def); }
+  fillLines('sasx_line_z1', 1);
+  fillLines('sasx_line_z2', 2);
+  fillLines('sasx_line_z3', 3);
+  fillLines('sasx_line_z4', 4);
+
+  function br(){ const r=document.querySelector('input[name="br"]:checked'); return r ? r.value : '1'; }
+  function san(t){ try{ return (typeof sanitize==='function')? sanitize(String(t)) : String(t); } catch(e){ return String(t); } }
+  function yes(v){ const s=String(v||'0').trim().toLowerCase(); return s==='1'||s==='yes'||s==='true'; }
+
+  async function sendTo(line, payload){
+    // use existing sendPayload + main line select, do not touch connect
+    const mainLine = document.getElementById('line');
+    if(typeof sendPayload==='function' && mainLine){
+      const prev = mainLine.value;
+      mainLine.value = String(line);
+      await sendPayload(payload);
+      mainLine.value = prev;
+      return;
+    }
+    // fallback to writer/frame if available
+    if(window.writer && typeof frame==='function'){
+      const f = frame(String(line), br(), payload);
+      await window.writer.write(f);
+    }else{
+      alert('Not connected');
+    }
+  }
+
+  // Z1 DORSAL
+  on($('sasx_send_z1'), 'click', async ()=>{
+    const d = $('sasx_dorsal').value.trim().replace(/\D/g,''); if(!d) return;
+    const dd = String(Math.min(999, parseInt(d,10))).padStart(3,'0');
+    const payload = '^cp 1 4 7^' + san(dd);
+    await sendTo($('sasx_line_z1').value, payload);
+  });
+
+  // Z2 Handler + Dog (clear then write)
+  
+on($('sasx_send_z2'), 'click', async ()=>{
+    const h = $('sasx_handler').value;
+    const d = $('sasx_dog').value;
+    const handler = cleanText(h), dog = cleanText(d);
+    let payload = '';
+    if(handler || dog){
+      const hl = handler.length + 1, dl = dog.length;
+      payload = `^cp 1 ${hl} 7^${handler} ^cp ${hl} ${hl+dl} 8^${dog}`;
+      if(payload.length>64){ payload = `^cs 7^${handler.slice(0,58)}`; }
+    }
+    const line = $('sasx_line_z2').value;
+    await sendTo(line, ''); // clear first
+    if(payload) await sendTo(line, payload);
+    sasPrev.z2 = [{text: handler + ' ', code:7}, {text: dog, code:8}]; sasRefresh();
+})
+
+  // Z3 Score or DIS
+  on($('sasx_send_z3'), 'click', async ()=>{
+    const f = Number($('sasx_faults').value || 0);
+    let r = Number($('sasx_refusals').value || 0);
+    const e = $('sasx_elim').value;
+    const line = $('sasx_line_z3').value;
+    if(yes(e)){
+      const dis = '^fd 5 1^^cp 1 10 1^  DIS^ic 3 1 2^^ic 3 1 11^';
+      await sendTo(line, dis);
+      return;
+    }
+    if(!Number.isInteger(r) || r<0) r=0;
+    if(r>3){ r=3; $('sasx_refusals').value=3; }
+    const fd = (!f) ? '^cp 1 2 2^ F^ic 3 2^^cp 3 5 2^' : `^cp 1 3 1^ F${f} `;
+    const rd = (!r) ? '^cp 4 5 2^R^ic 3 2^' : `^cp 5 9 1^R${r}`;
+    await sendTo(line, fd + rd);
+  });
+
+  // Z4 Country (clear then write)
+  on($('sasx_send_z4'), 'click', async ()=>{
+    const c = $('sasx_country').value.trim();
+    const line = $('sasx_line_z4').value;
+    await sendTo(line, ''); // clear first
+    const payload = c ? '^cp 1 3 7^' + san(c) : '^cp 1 3 7^';
+    await sendTo(line, payload);
+  });
+
+  // ensure Clear cleans Z2 (handler+dog)
+  (function(){
+    const btn = document.getElementById('clearAll');
+    if(btn){
+      btn.addEventListener('click', ()=>{
+        setTimeout(()=>{ try{ sendTo('2', ''); }catch(e){} }, 80);
+      });
+    }
+  })();
+
+
+  // Lock other modules while SAS is active
+  (function(){
+    const box = document.getElementById('sasx_box');
+    const toggle = document.getElementById('sasx_enable');
+    if(!toggle || !box) return;
+
+    function lockOthers(on){
+      const allow = new Set(['sasx_enable','btnConnect','btnDisconnect','clearAll','brSlider']);
+      const nodes = Array.from(document.querySelectorAll('input,select,textarea,button'));
+      nodes.forEach(el=>{
+      const isBrightnessRadio = (el.name === 'br');
+      const insideTop = !!el.closest('.mod1'); const inside = box.contains(el) || allow.has(el.id) || isBrightnessRadio || insideTop;
+      if(on){
+          if(!inside){
+            if(el.dataset.sasxPrev===undefined) el.dataset.sasxPrev = el.disabled ? '1':'0';
+            el.disabled = true;
+          }
+        }else{
+          if(el.dataset.sasxPrev!==undefined){
+            el.disabled = (el.dataset.sasxPrev==='1');
+            delete el.dataset.sasxPrev;
+          }
+        }
+      });
+    }
+
+    toggle.addEventListener('change', ()=>{
+      const on = !!toggle.checked;
+      document.getElementById('sasx_box').style.display = on ? 'block' : 'none';
+      lockOthers(on);
+    });
+
+    // apply lock if enabled on load
+    if(toggle.checked){
+      document.getElementById('sasx_box').style.display = 'block';
+      lockOthers(true);
+    }
+  })();
+
+})();
+</script>
+
+
+<script id="hdmi-addon-min">
+(function(){
+  function q(id){ return document.getElementById(id); }
+  let hdmiWin = null;
+
+  // Inject CSS so preview text uses fixed 32px
+  function ensureStyle(){
+    if(document.getElementById("hdmiAddonStyle")) return;
+    const st = document.createElement("style");
+    st.id = "hdmiAddonStyle";
+    st.textContent = "#hdmiPreviewInner{font-size:32px !important}";
+    document.head.appendChild(st);
+  }
+
+  // Ensure inner span inside preview host
+  function ensureInner(){
+    const host = q("hdmiPreview");
+    if(!host) return;
+    let inner = q("hdmiPreviewInner");
+    if(!inner){
+      inner = document.createElement("span");
+      inner.id = "hdmiPreviewInner";
+      inner.textContent = host.textContent || "";
+      host.textContent = "";
+      host.appendChild(inner);
+    }
+    return inner;
+  }
+
+  function renderToPreview(text){
+    const inner = ensureInner();
+    if(inner) inner.textContent = text || "";
+  }
+
+  function renderToHdmi(text){
+    if(hdmiWin && !hdmiWin.closed){
+      const el = hdmiWin.document.getElementById("hdmiText");
+      if(el) el.textContent = text || "";
+    }
+  }
+
+  function applyStyles(){
+    const bg = q("hdmiBg")?.value || "#000";
+    const fg = q("hdmiFg")?.value || "#fff";
+    const fs = q("hdmiFont")?.value || "96px";
+    const box = q("hdmiPreviewBox");
+    const inner = ensureInner();
+    if(box) box.style.background = bg;
+    if(inner){ inner.style.color = fg; } // size is fixed by CSS to 32px
+    if(hdmiWin && !hdmiWin.closed){
+      const d = hdmiWin.document;
+      d.body.style.background = bg;
+      const wrap = d.getElementById("hdmiWrap");
+      const txt  = d.getElementById("hdmiText");
+      if(wrap){
+        wrap.style.width="100vw"; wrap.style.height="100vh";
+        wrap.style.display="flex"; wrap.style.alignItems="center"; wrap.style.justifyContent="center";
+        wrap.style.background = bg;
+      }
+      if(txt){
+        txt.style.color = fg;
+        txt.style.fontFamily = "Helvetica,Arial,sans-serif";
+        txt.style.whiteSpace = "nowrap";
+        txt.style.letterSpacing = "1px";
+        txt.style.textAlign = "center";
+        txt.style.fontSize = fs; // HDMI uses full selected size
+      }
+    }
+  }
+
+  function openHdmi(){
+    if(!q("hdmiEnable")?.checked){ alert("HDMI disabled"); return; }
+    const w = window.open("about:blank","MLED_HDMI");
+    if(!w){ alert("Pop up blocked"); return; }
+    hdmiWin = w;
+    const bg = q("hdmiBg")?.value || "#000";
+    const fg = q("hdmiFg")?.value || "#fff";
+    const fs = q("hdmiFont")?.value || "96px";
+    const doc = `<!doctype html>
+<html><head><meta charset="utf-8"><title>HDMI Output</title>
+<style>
+html,body,#hdmiWrap{width:100vw;height:100vh;margin:0}
+#hdmiWrap{display:flex;align-items:center;justify-content:center;background:${bg}}
+#hdmiText{font-family:Helvetica,Arial,sans-serif;white-space:nowrap;letter-spacing:1px;text-align:center;color:${fg};font-size:${fs}}
+</style></head>
+<body><div id="hdmiWrap"><div id="hdmiText"></div></div></body></html>`;
+    w.document.open(); w.document.write(doc); w.document.close();
+    try{ w.focus(); }catch(e){}
+    // mirror current preview
+    const t = (q("pvLeft")?.textContent) || "";
+    renderToHdmi(t);
+    applyStyles();
+  }
+
+  function fullscreenHdmi(){
+    if(!hdmiWin || hdmiWin.closed){ openHdmi(); }
+    try{ const de = hdmiWin.document.documentElement; if(de.requestFullscreen) de.requestFullscreen(); }catch(e){}
+  }
+
+  function setupMirror(){
+    const pv = q("pvLeft");
+    if(!pv) return;
+    const pick = () => pv.textContent || "";
+    const mo = new MutationObserver(()=>{ const t=pick(); renderToPreview(t); renderToHdmi(t); });
+    mo.observe(pv, {childList:true, characterData:true, subtree:true});
+    const t0 = pick(); renderToPreview(t0); renderToHdmi(t0);
+  }
+
+  function setupWatchdog(){
+    const ids = ["hdmiEnable","hdmiOpen","hdmiFullscreen","hdmiBg","hdmiFg","hdmiFont"];
+    setInterval(()=>{
+      const en = q("hdmiEnable");
+      ids.forEach(id=>{
+        const el = q(id); if(!el) return;
+        if(id==="hdmiOpen" || id==="hdmiFullscreen"){
+          el.disabled = !(en && en.checked);
+        }else{
+          el.disabled = false;
+        }
+      });
+    }, 400);
+  }
+
+  window.addEventListener("DOMContentLoaded", ()=>{
+    ensureStyle();
+    ensureInner();
+    setupMirror();
+    setupWatchdog();
+    q("hdmiOpen")?.addEventListener("click", openHdmi);
+    q("hdmiFullscreen")?.addEventListener("click", fullscreenHdmi);
+    ["hdmiBg","hdmiFg","hdmiFont"].forEach(id=> q(id)?.addEventListener("change", applyStyles));
+    applyStyles();
+  });
+})();
+
+// --- robust disable/enable for modules, covers native buttons and .btn divs ---
+(function(){
+  const PAIRS = [
+    ['mod2','mod2_enable'],
+    ['modCW','cw_enable'],
+    ['mod3','timer_enable'],
+    ['mod4','sasx_enable'],
+    ['mod5','hdmiEnable']
+  ];
+  function setInteractive(el, active){
+    try{
+      const tag = (el.tagName||'').toLowerCase();
+      if(tag === 'button' || tag === 'input' || tag === 'select' || tag === 'textarea'){
+        el.disabled = !active;
+        if(!active){ el.setAttribute('disabled','disabled'); } else { el.removeAttribute('disabled'); }
+      }else if(el.classList && el.classList.contains('btn')){
+        el.classList.toggle('is-disabled', !active);
+      }
+    }catch(_){}
+  }
+  function applyBox(boxId, toggleId){
+    const box = document.getElementById(boxId);
+    const t = document.getElementById(toggleId);
+    if(!box || !t) return;
+    const on = !!t.checked;
+    box.classList.toggle('disabled', !on);
+    box.querySelectorAll('button,input,select,textarea,.btn').forEach(el=>{
+      // keep toggle & Clear active
+      if(el === t) return;
+      if(el.closest && el.closest('.box-toggle')) return;
+      if(el.id === 'clearAll') return;
+      setInteractive(el, on);
+    });
+  }
+  function applyAll(){ PAIRS.forEach(p=>applyBox(p[0], p[1])); }
+
+  // Wire toggles
+  PAIRS.forEach(([boxId,tid])=>{
+    const t = document.getElementById(tid);
+    if(!t) return;
+    t.addEventListener('change', applyAll);
+  });
+
+  // Enforce after Clear
+  const clr = document.getElementById('clearAll');
+  if(clr){
+    clr.addEventListener('click', ()=>{
+      applyAll();
+      setTimeout(applyAll, 0);
+      setTimeout(applyAll, 50);
+      setTimeout(applyAll, 200);
+    });
+  }
+
+  // Initial
+  applyAll();
+})(); 
+// --- end robust disable/enable ---
+
+// --- harden: explicitly disable action buttons in OFF boxes ---
+(function(){
+  const MAP = {
+    mod2: ['#sendTextBtn'],       // MLED Text main action
+    modCW: ['#cwStartBtn', '#cwStopBtn'],
+    mod3: ['#countupStart','#countupStop','#countdownStart','#countdownStop']
+  };
+  function apply(boxId, on){
+    // generic already handled above; here we reinforce action buttons
+    const list = MAP[boxId] || [];
+    list.forEach(sel=>{
+      const el = document.querySelector(sel);
+      if(!el) return;
+      if(on){
+        el.disabled = false;
+        el.classList.remove('is-disabled');
+      }else{
+        el.disabled = true;
+        if(el.classList) el.classList.add('is-disabled');
+      }
+    });
+  }
+  function applyAll(){
+    const states = {
+      mod2: !!(document.getElementById('mod2_enable')?.checked),
+      modCW: !!(document.getElementById('cw_enable')?.checked),
+      mod3: !!(document.getElementById('timer_enable')?.checked)
+    };
+    Object.keys(states).forEach(k=>apply(k, states[k]));
+  }
+  // initial + after Clear + on any toggle change
+  ['mod2_enable','cw_enable','timer_enable'].forEach(id=>{
+    const t = document.getElementById(id);
+    if(t) t.addEventListener('change', applyAll);
+  });
+  const clr = document.getElementById('clearAll');
+  if(clr){
+    clr.addEventListener('click', ()=>{
+      applyAll();
+      setTimeout(applyAll, 0);
+      setTimeout(applyAll, 50);
+      setTimeout(applyAll, 200);
+    });
+  }
+  applyAll();
+})(); 
+// --- end harden ---
+</script>
+
+</body>
+</html>
